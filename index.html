@@ -18,9 +18,10 @@
   .brand { color:#fff; font-size:18px; font-weight:600; padding:0 10px 2px; display:flex; align-items:center; gap:8px; }
   .brand i { width:26px; height:26px; border-radius:7px; background:var(--accent); display:grid; place-items:center; font-style:normal; font-size:14px; }
   .brand-sub { font-size:11px; padding:0 10px 16px; color:#94a3b8; }
-  nav button { all:unset; display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:8px; cursor:pointer; font-size:14px; }
-  nav button:hover { background:#1f2937; }
-  nav button.on { background:#1f2937; color:#fff; box-shadow:inset 3px 0 0 var(--accent); }
+  nav { display:flex; flex-direction:column; gap:2px; }
+  nav button { all:unset; box-sizing:border-box; width:100%; display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:8px; cursor:pointer; font-size:14px; }
+  nav button:hover { background:rgba(255,255,255,.06); color:#fff; }
+  nav button.on { background:rgba(255,255,255,.12); color:#fff; font-weight:600; }
   nav button i { width:18px; text-align:center; color:#94a3b8; } nav button.on i { color:#fff; }
   nav .grp { font-size:11px; color:#64748b; padding:14px 12px 4px; }
   .status { margin-top:auto; font-size:11px; line-height:1.7; padding:10px 12px; border-top:1px solid #1f2937; }
