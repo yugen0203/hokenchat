@@ -1,0 +1,20 @@
+# 秘密情報・個人情報（GitHub に絶対に上げない）
+.env
+data/hokenchat.db
+data/hokenchat.db-*
+data/uploads/
+data/logs/
+line_friend_qr.png
+
+# 各 PC で作るもの
+.venv/
+tools/ocr
+__pycache__/
+*.pyc
+
+# テスト動画（大きいので別途共有）
+test-videos/
+
+# OS
+.DS_Store
+Thumbs.db
