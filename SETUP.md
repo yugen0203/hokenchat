@@ -50,11 +50,11 @@ winget install -e --id Git.Git
 ## 3. リポジトリを置く
 
 ```bash
-git clone <このリポジトリのURL> hokenchat
+git clone https://github.com/yugen0203/hokenchat.git hokenchat
 cd hokenchat
 ```
 - 置き場所は利用者のホームフォルダの下など、**本人だけが使える場所**にする（共有フォルダは避ける）
-- 非公開リポジトリの場合、GitHub へのログインが必要（利用者に操作してもらう）
+- 公開リポジトリなので、GitHub へのログインは不要
 
 ## 4. セットアップを実行する
 
