@@ -37,7 +37,7 @@ def step_venv():
     r = run([str(VPY), "-m", "pip", "install", "-q", "-r", "requirements.txt"])
     if r.returncode:
         ng("依存ライブラリ（requirements.txt）を入れられませんでした", "ネット接続を確認して、もう一度実行してください")
-    ok(".venv と依存ライブラリ（PyMuPDF）")
+    ok(".venv と依存ライブラリ（PyMuPDF・cryptography）")
 
 
 def step_ollama():
@@ -65,7 +65,7 @@ def step_models(skip):
 
 def step_ocr():
     sample = ROOT / "tests" / "samples" / "社内マニュアル_来客対応_写真.png"
-    r = run([str(VPY), "-c", f"import app; print(app.ocr(r'{sample}'))"], capture_output=True, text=True, encoding="utf-8")
+    r = run([str(VPY), "-c", f"from hc import rag; print(rag.ocr(r'{sample}'))"], capture_output=True, text=True, encoding="utf-8")
     if r.returncode == 0 and "駐車場" in r.stdout:
         ok("文字認識（写真・スキャンしたPDFの取り込み）")
     elif WIN:
@@ -87,7 +87,9 @@ def step_ingest():
 def step_test():
     if run([str(VPY), "eval.py", "--quick"]).returncode:
         ng("自己テストに失敗しました", "表示されたエラーを確認してください")
-    ok("自己テスト（入力ガード・文書の分割）")
+    if run([str(VPY), "tests/test_phase2.py"], capture_output=True).returncode:
+        ng("フェーズ2の自己テスト（tests/test_phase2.py）に失敗しました", f"{VPY} tests/test_phase2.py を実行して、表示されたエラーを確認してください")
+    ok("自己テスト（入力ガード・文書の分割・認証・保管庫・郵送・見積・監査ログ）")
 
 
 if __name__ == "__main__":
@@ -101,3 +103,4 @@ if __name__ == "__main__":
             ng("アイコンを作れませんでした", "表示されたエラーを確認してください")
         ok("アイコン（" + ("デスクトップとスタートメニュー" if WIN else "アプリケーションフォルダとデスクトップ") + "）")
     print("\nセットアップ完了。デスクトップの「hokenchat」をダブルクリックすると起動します。")
+    print("初回の起動では「初期設定」で管理者のアカウントを作り、スマホの認証アプリ（多要素認証）を登録します。")

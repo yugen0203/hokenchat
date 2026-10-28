@@ -1,8 +1,13 @@
 """精度チェック: python3 eval.py   （先に Ollama を起動しておく）
 1) 入力ガード  2) 社内RAG（正しい条を拾えるか・範囲外は「該当なし」か）  3) LINE の分類精度
+--quick: LLM を使わない部分だけ（setup.py の自己テスト）。フェーズ2の機能の自動テストは tests/test_phase2.py
 """
 import sys, time
-import app
+from types import SimpleNamespace
+from hc import guard as g, rag, line as ln, config
+
+app = SimpleNamespace(guard=g.guard, number_guard=g.number_guard, split=rag.split, internal=rag.internal,
+                      line=ln.respond, TOP_K=config.TOP_K)
 
 # 1) 入力ガード（LLM 不要）
 assert app.guard("マイナンバーは 1234 5678 9018 です")            # 検査数字が合う架空の番号
@@ -21,6 +26,7 @@ assert app.number_guard("カード 4111 1111 1111 1111") and not app.number_guar
 print("1) 入力ガード: OK")
 if "--quick" in sys.argv:  # setup.py の自己テスト用（LLM を使わない部分だけ）
     sys.exit()
+rag.seed()  # 初回だけ data/docs を取り込む（取り込み済みなら何もしない）
 
 # 2) 社内RAG：(質問, 期待する文書名の一部, 期待する条) / 期待 None = 範囲外で「該当なし」になるべき
 RAG = [

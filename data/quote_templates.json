@@ -1,0 +1,39 @@
+{
+  "_note": "見積依頼書の様式（試作の仮置き）。実際の様式（要件定義書 Q14）が届いたら、この項目を差し替える。required=true が未入力なら承認できない",
+  "kinds": {
+    "自動車": [
+      {"key": "contractor", "label": "契約者名", "required": true},
+      {"key": "start", "label": "始期日（YYYY-MM-DD）", "required": true},
+      {"key": "car_name", "label": "車名", "required": true},
+      {"key": "car_model", "label": "型式", "required": true},
+      {"key": "first_reg", "label": "初度登録年月", "required": true},
+      {"key": "grade", "label": "ノンフリート等級", "required": false},
+      {"key": "driver_age", "label": "運転者年齢条件", "required": true},
+      {"key": "driver_limit", "label": "運転者限定（本人・夫婦・家族・限定なし）", "required": true},
+      {"key": "use", "label": "使用目的（日常・レジャー／通勤・通学／業務）", "required": false},
+      {"key": "vehicle_ins", "label": "車両保険（一般・エコノミー・なし）", "required": true},
+      {"key": "current_insurer", "label": "現在の保険会社", "required": false},
+      {"key": "memo", "label": "その他の要望", "required": false}
+    ],
+    "火災": [
+      {"key": "contractor", "label": "契約者名", "required": true},
+      {"key": "start", "label": "始期日（YYYY-MM-DD）", "required": true},
+      {"key": "location", "label": "建物の所在地", "required": true},
+      {"key": "structure", "label": "構造（M・T・H構造）", "required": true},
+      {"key": "built", "label": "建築年月", "required": true},
+      {"key": "floor_area", "label": "延床面積（㎡）", "required": true},
+      {"key": "building_sum", "label": "建物の保険金額", "required": true},
+      {"key": "contents_sum", "label": "家財の保険金額", "required": false},
+      {"key": "earthquake", "label": "地震保険（付帯する・しない）", "required": true},
+      {"key": "term", "label": "保険期間（年）", "required": true},
+      {"key": "memo", "label": "その他の要望", "required": false}
+    ],
+    "その他": [
+      {"key": "contractor", "label": "契約者名", "required": true},
+      {"key": "start", "label": "始期日（YYYY-MM-DD）", "required": true},
+      {"key": "product", "label": "商品・種目", "required": true},
+      {"key": "coverage", "label": "希望する補償内容", "required": true},
+      {"key": "memo", "label": "その他の要望", "required": false}
+    ]
+  }
+}

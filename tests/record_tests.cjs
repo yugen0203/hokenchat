@@ -2,6 +2,7 @@
 // 実行: NODE_PATH=$(npm root -g) TUNNEL=https://xxxx.trycloudflare.com LINE_TEST_NAME=<実機テストに使うLINEの表示名> node tests/record_tests.cjs
 // 出力: test-videos/T01_xxx.webm …（mp4 変換と結合は tests/make_videos.sh）と test-videos/results.json
 // 前提: hokenchat 本体(8765)・Ollama・受付サーバー(8766/8767)・トンネルが起動していること
+// 第0.2版からログインが必要：テスト用の社員（管理者）を作り、HC_LOGIN・HC_PASSWORD・HC_TOTP_SECRET（認証アプリに登録したキー）を渡す
 const { chromium } = require("playwright");
 const fs = require("fs"), path = require("path"), { execSync } = require("child_process");
 
@@ -11,7 +12,28 @@ const APP = "http://127.0.0.1:8765";
 const TUNNEL = process.env.TUNNEL || "";
 const FAKE = "Utestvideo"; // 疑似お客さま（LINE を通さず、受付サーバーと同じ本体 API を呼ぶ）
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const post = (p, b) => fetch(APP + p, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(b) }).then(r => r.json());
+const crypto = require("crypto");
+let COOKIE = "";
+const INTERNAL = () => fs.readFileSync(path.join(process.env.HOKENCHAT_DATA || path.join(ROOT, "data"), "keys", "internal.token"), "utf8").trim();
+function totp(sec) {
+  const a = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"; let bits = "";
+  for (const c of sec.replace(/=+$/, "")) bits += a.indexOf(c).toString(2).padStart(5, "0");
+  const key = Buffer.from(bits.match(/.{8}/g).map(b => parseInt(b, 2)));
+  const ctr = Buffer.alloc(8); ctr.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 30000)));
+  const h = crypto.createHmac("sha1", key).update(ctr).digest(), o = h[h.length - 1] & 15;
+  return String((h.readUInt32BE(o) & 0x7fffffff) % 1e6).padStart(6, "0");
+}
+const H = () => ({ "Content-Type": "application/json", "X-HC": "1", Cookie: COOKIE });
+const get = p => fetch(APP + p, { headers: H() }).then(r => r.json());
+const post = (p, b) => fetch(APP + p, { method: "POST", headers: p === "/api/line/incoming" ? { "Content-Type": "application/json", "X-Internal-Token": INTERNAL() } : H(),
+  body: JSON.stringify(b) }).then(r => r.json());
+async function login() {
+  const t = await post("/api/login", { login: process.env.HC_LOGIN, password: process.env.HC_PASSWORD });
+  if (!t.ticket) throw new Error("ログインできません：" + (t.error || ""));
+  const r = await fetch(APP + "/api/login/code", { method: "POST", headers: H(), body: JSON.stringify({ ticket: t.ticket, code: totp(process.env.HC_TOTP_SECRET || "") }) });
+  COOKIE = (r.headers.get("set-cookie") || "").split(";")[0];
+  if (!COOKIE) throw new Error("確認コードが通りません");
+}
 const customer = text => post("/api/line/incoming", { user_id: FAKE, name: "テスト用お客さま（疑似）", type: "text", text });
 
 async function caption(page, t, status) {
@@ -49,7 +71,7 @@ async function openLine(page, uid) {
   await page.click(`.item[data-id="${uid}"]`);
   await sleep(1500);
 }
-const lastMsgs = async uid => (await fetch(`${APP}/api/line/msgs?user=${uid}`).then(r => r.json()));
+const lastMsgs = async uid => await get(`/api/line/msgs?user=${uid}`);
 async function setMode(page, m) { await page.click(`#lmode button[data-m=${m}]`); await sleep(1500); }
 async function customerSays(page, text, wait = 6000) {
   await caption(page, page.__t, "疑似お客さまが送信：" + text);
@@ -108,22 +130,22 @@ const TESTS = [
       const last = (await lastMsgs(FAKE)).pop(); return r.reply === null && last.sender === "customer"; } },
   { id: "T13", name: "LINE_担当者が画面から返信_実機", title: "公式LINE（実機）：担当者が画面から送ると、お客さまのLINEに届く",
     expect: "テスト担当者のLINEに担当者のメッセージが届き、画面に「担当者」として記録される", real: true,
-    run: async p => { const u = (await fetch(APP + "/api/line/users").then(r => r.json())).find(x => x.name === process.env.LINE_TEST_NAME);
+    run: async p => { const u = (await get("/api/line/users")).find(x => x.name === process.env.LINE_TEST_NAME);
       if (!u) return false;
       await openLine(p, u.user_id);
       const text = "【テスト動画】担当者からの送信テストです。返信は不要です。";
-      const input = p.locator("#lform input"); await input.click(); await input.pressSequentially(text, { delay: 40 });
-      await input.press("Enter"); await sleep(4000);
+      const input = p.locator("#lform textarea"); await input.click(); await input.pressSequentially(text, { delay: 40 });
+      await p.click("#lform button.g"); await sleep(4000);
       const last = (await lastMsgs(u.user_id)).pop(); return last.sender === "staff" && last.text === text; } },
 
   { id: "T14", name: "登録文書の一覧", title: "管理：RAGの対象になっている文書を一覧で確認できる",
-    expect: "3つの架空文書（自動車・火災・社内規程）と版・条の数が表示される",
+    expect: "3つの架空文書（自動車・火災・社内規程）が「検索対象」として、版・条の数とともに表示される",
     run: async p => { await p.click("nav button[data-v=docs]"); await sleep(2500);
-      return (await p.locator("#docs tr").count()) === 3; } },
+      return (await p.locator("#dlist .tag.ok").count()) >= 3; } },
   { id: "T15", name: "利用ログ_本文は保存しない", title: "管理：利用ログには日時・結果・参照だけを残し、質問の本文は残さない",
     expect: "直前のテストの記録が並び、質問の本文（例：「タイヤだけパンク」「持病で通院中」）はどこにも出てこない",
     run: async p => { await p.click("nav button[data-v=audit]"); await sleep(3000);
-      const txt = await p.locator("#audit").innerText(); return txt.length > 0 && !txt.includes("タイヤだけパンク") && !txt.includes("持病で通院中") && !txt.includes("1234 5678"); } },
+      const txt = await p.locator("#p-audit").innerText(); return txt.length > 0 && !txt.includes("タイヤだけパンク") && !txt.includes("持病で通院中") && !txt.includes("1234 5678"); } },
 ];
 
 // ---------- 画面以外のテスト（結果を表のページにして録画） ----------
@@ -168,11 +190,13 @@ pre{background:#111827;color:#e5e7eb;padding:18px;border-radius:10px;white-space
   const only = process.env.ONLY ? process.env.ONLY.split(",") : null;
   const browser = await chromium.launch();
   const results = [];
+  await login();
   // 疑似お客さまをトーク一覧に出しておく
   await post("/api/line/incoming", { user_id: FAKE, name: "テスト用お客さま（疑似）", type: "follow" });
   for (const t of [...TESTS, ...EXTRA]) {
     if (only && !only.includes(t.id)) continue;
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, recordVideo: { dir: OUT, size: { width: 1280, height: 800 } } });
+    await ctx.addCookies([{ name: "hc_session", value: COOKIE.split("=")[1], domain: "127.0.0.1", path: "/" }]);
     const page = await ctx.newPage(); page.__t = t;
     let ok = false, err = "";
     try {
@@ -199,6 +223,6 @@ pre{background:#111827;color:#e5e7eb;padding:18px;border-radius:10px;white-space
   }
   await browser.close();
   // 疑似お客さまのデータは消す
-  execSync(`python3 -I -c "import sqlite3;c=sqlite3.connect('data/hokenchat.db');c.execute(\\"DELETE FROM line_msgs WHERE user_id='${FAKE}'\\");c.execute(\\"DELETE FROM line_users WHERE user_id='${FAKE}'\\");c.commit()"`, { cwd: ROOT });
+  execSync(`python3 -I -c "import sqlite3;c=sqlite3.connect('${(process.env.HOKENCHAT_DATA || "data").replace(/\\/g, "/")}/hokenchat.db');c.execute(\\"DELETE FROM line_msgs WHERE user_id='${FAKE}'\\");c.execute(\\"DELETE FROM line_users WHERE user_id='${FAKE}'\\");c.commit()"`, { cwd: ROOT });
   fs.writeFileSync(path.join(OUT, "results.json"), JSON.stringify(results, null, 2));
 })();

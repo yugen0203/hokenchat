@@ -17,6 +17,9 @@ from pathlib import Path
 ROOT = Path(__file__).parent
 APP = "http://127.0.0.1:8765/api/line/incoming"
 LINE_API = "https://api.line.me/v2/bot"
+LINE_DATA = "https://api-data.line.me/v2/bot"   # 画像・ファイルの中身を取る口
+TOKEN_FILE = ROOT / "data" / "keys" / "internal.token"  # 本体が作る合言葉（同じ PC の中だけで使う）
+MAX_FILE = 10_000_000
 FALLBACK = "お問い合わせありがとうございます。内容を確認し、担当者からご連絡します。お急ぎの場合は0120-000-001（平日9:00〜17:00）へお電話ください。"
 names = {}  # ponytail: 表示名のキャッシュはメモリだけ。再起動したら取り直す
 
@@ -36,8 +39,10 @@ def verify(secret, body, sig):
     return bool(sig) and hmac.compare_digest(mac, sig)
 
 
-def call(url, data=None, token=None):
+def call(url, data=None, token=None, internal=False):
     h = {"Content-Type": "application/json"} | ({"Authorization": f"Bearer {token}"} if token else {})
+    if internal:
+        h["X-Internal-Token"] = TOKEN_FILE.read_text().strip() if TOKEN_FILE.exists() else ""
     req = urllib.request.Request(url, json.dumps(data).encode() if data is not None else None, h)
     with urllib.request.urlopen(req, timeout=60) as r:
         body = r.read()
@@ -53,6 +58,14 @@ def name_of(uid, token):
     return names[uid]
 
 
+def content(mid, token):
+    """お客さまが送った画像・PDFの中身を LINE から取る（中身は本体で暗号化して保管。ここでは保存しない）"""
+    req = urllib.request.Request(f"{LINE_DATA}/message/{mid}/content", headers={"Authorization": f"Bearer {token}"})
+    with urllib.request.urlopen(req, timeout=60) as r:
+        data = r.read(MAX_FILE + 1)
+        return (data, r.headers.get("Content-Type", "").split(";")[0]) if len(data) <= MAX_FILE else (b"", "")
+
+
 def handle(events, token):
     for ev in events:
         uid = ev.get("source", {}).get("userId")
@@ -63,8 +76,14 @@ def handle(events, token):
         print("受信:", kind, msg.get("type", ""))  # 種類だけ。本文は出さない
         b = {"user_id": uid, "name": name_of(uid, token), "type": "follow" if kind == "follow" else msg.get("type"),
              "text": msg.get("text", "")}
+        if b["type"] in ("image", "file"):
+            try:
+                data, mime = content(msg["id"], token)
+                b |= {"content_b64": base64.b64encode(data).decode(), "mime": mime, "file_name": msg.get("fileName", "")}
+            except Exception as e:
+                print("画像・ファイルの取得に失敗:", str(e)[:200])
         try:
-            reply = call(APP, b).get("reply")
+            reply = call(APP, b, internal=True).get("reply")
         except Exception as e:
             print("hokenchat本体のエラー:", str(e)[:200])
             reply = FALLBACK if kind == "message" else None  # 本体が止まっていても、お客さまを無言にしない

@@ -7,324 +7,83 @@
 <link rel="stylesheet" href="/static/fa/css/fontawesome.min.css">
 <link rel="stylesheet" href="/static/fa/css/solid.min.css">
 <link rel="stylesheet" href="/static/fa/css/regular.min.css">
-<style>
-  :root { --bg:#f5f6f8; --side:#111827; --side-ink:#cbd5e1; --card:#fff; --ink:#1d2330; --sub:#667085; --line:#06c755;
-          --accent:#1f4fd1; --accent-bg:#eef2ff; --warn:#b42318; --warn-bg:#fee4e2; --bd:#e3e6eb; }
-  * { box-sizing:border-box; }
-  html, body { height:100%; margin:0; overflow:hidden; }
-  body { font-family:-apple-system,"Hiragino Sans","Noto Sans JP","Yu Gothic UI",sans-serif; background:var(--bg); color:var(--ink);
-         display:grid; grid-template-columns:220px 1fr; user-select:none; }
-  aside { background:var(--side); color:var(--side-ink); display:flex; flex-direction:column; padding:18px 10px; gap:4px; }
-  .brand { color:#fff; font-size:18px; font-weight:600; padding:0 10px 2px; display:flex; align-items:center; gap:8px; }
-  .brand i { width:26px; height:26px; border-radius:7px; background:var(--accent); display:grid; place-items:center; font-style:normal; font-size:14px; }
-  .brand-sub { font-size:11px; padding:0 10px 16px; color:#94a3b8; }
-  nav { display:flex; flex-direction:column; gap:2px; }
-  nav button { all:unset; box-sizing:border-box; width:100%; display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:8px; cursor:pointer; font-size:14px; }
-  nav button:hover { background:rgba(255,255,255,.06); color:#fff; }
-  nav button.on { background:rgba(255,255,255,.12); color:#fff; font-weight:600; }
-  nav button i { width:18px; text-align:center; color:#94a3b8; } nav button.on i { color:#fff; }
-  nav .grp { font-size:11px; color:#64748b; padding:14px 12px 4px; }
-  .status { margin-top:auto; font-size:11px; line-height:1.7; padding:10px 12px; border-top:1px solid #1f2937; }
-  .dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:#22c55e; margin-right:6px; }
-  .dot.ng { background:#ef4444; }
-  main { display:flex; flex-direction:column; min-width:0; height:100vh; }
-  .top { display:flex; align-items:baseline; gap:10px; padding:16px 24px; border-bottom:1px solid var(--bd); background:var(--card); }
-  .top h1 { font-size:17px; margin:0; white-space:nowrap; } .top span { font-size:12px; color:var(--sub); }
-  .view { display:none; flex:1; min-height:0; } .view.on { display:flex; }
-  .chat { flex-direction:column; width:100%; }
-  .log { flex:1; overflow:auto; padding:20px 24px; display:flex; flex-direction:column; gap:12px; user-select:text; }
-  .msg { max-width:780px; padding:12px 14px; border-radius:12px; white-space:pre-wrap; line-height:1.7; font-size:14px; }
-  .me { align-self:flex-end; background:var(--accent); color:#fff; }
-  .ai { align-self:flex-start; background:var(--card); border:1px solid var(--bd); }
-  .warn { color:var(--warn); font-weight:600; }
-  .notice { margin-top:8px; font-size:12px; color:#92400e; background:#fef3c7; padding:6px 8px; border-radius:6px; }
-  details { margin-top:8px; font-size:12px; } summary { cursor:pointer; color:var(--accent); }
-  .src { border-left:3px solid var(--accent); padding:4px 8px; margin:6px 0; background:#f8fafc; }
-  .time { font-size:11px; color:var(--sub); margin-top:4px; }
-  .composer { padding:12px 24px 18px; background:var(--bg); }
-  .samples { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
-  .samples button { all:unset; cursor:pointer; background:var(--accent-bg); color:var(--accent); padding:4px 10px; border-radius:999px; font-size:12px; }
-  form { display:flex; gap:8px; background:var(--card); border:1px solid var(--bd); border-radius:12px; padding:6px; }
-  input { flex:1; border:0; outline:0; padding:10px; font-size:14px; background:transparent; }
-  form button { border:0; border-radius:8px; background:var(--accent); color:#fff; padding:0 18px; font-size:14px; cursor:pointer; }
-  form button:disabled { opacity:.5; }
-  .tag { display:inline-block; font-size:11px; padding:1px 6px; border-radius:4px; background:var(--accent-bg); color:var(--accent); margin-bottom:4px; }
-  .tag.h { background:var(--warn-bg); color:var(--warn); }
-  /* LINE 模擬：PC版の1:1トーク風 */
-  #v-line { padding:16px; }
-  .lwin { display:flex; width:100%; border:1px solid var(--bd); border-radius:10px; overflow:hidden; background:#fff; }
-  .llist { width:260px; flex-shrink:0; border-right:1px solid var(--bd); display:flex; flex-direction:column; }
-  .llist h3 { font-size:16px; margin:0; padding:16px 16px 10px; }
-  .llist .search { margin:0 12px 8px; padding:7px 10px; border-radius:6px; background:#f2f3f5; color:#9aa0a6; font-size:12px; }
-  .item { display:flex; gap:10px; padding:10px 14px; align-items:center; }
-  .item.on { background:#eef0f3; }
-  .item .t { flex:1; min-width:0; } .item b { font-size:13px; display:block; }
-  .item small { font-size:11px; color:var(--sub); display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .av { width:36px; height:36px; border-radius:50%; flex-shrink:0; display:grid; place-items:center; color:#fff; font-size:14px; background:#1f4fd1; }
-  .av.g { background:#cbd5e1; }
-  .ltalk { flex:1; min-width:0; display:flex; flex-direction:column; background:#8fadd6; }
-  .lhead { background:#fff; padding:12px 18px; border-bottom:1px solid var(--bd); display:flex; align-items:center; gap:8px; font-size:15px; font-weight:600; }
-  .badge { font-size:10px; font-weight:500; color:#fff; background:#06c755; padding:1px 6px; border-radius:4px; }
-  .ltalk .log { padding:16px 18px; gap:14px; }
-  .lrow { display:flex; align-items:flex-end; gap:6px; }
-  .lrow.out { align-self:flex-end; flex-direction:row-reverse; }
-  .lrow.in { align-self:flex-start; align-items:flex-start; }
-  .lrow .nm { font-size:11px; color:#2b3a55; margin:0 0 3px 2px; }
-  .bubble { max-width:440px; padding:9px 12px; border-radius:18px; font-size:14px; line-height:1.6; white-space:pre-wrap; background:#fff; color:#111; }
-  .lrow.out .bubble { background:#85e249; }
-  .lmeta { font-size:10px; color:#2b3a55; line-height:1.3; text-align:right; white-space:nowrap; }
-  .dbg { margin-top:6px; padding-top:5px; border-top:1px dashed #d0d5dd; font-size:11px; color:var(--sub); }
-  .dbg.h { color:var(--warn); }
-  .ltalk .composer { background:#fff; padding:8px 12px 12px; border-top:1px solid var(--bd); }
-  .ltalk .samples { flex-wrap:nowrap; overflow-x:auto; padding-bottom:4px; }
-  .ltalk .samples button { white-space:nowrap; background:#fff; color:#06a24a; border:1px solid #06c755; }
-  .ltalk form { border:0; padding:0; } .ltalk form button { background:#06c755; }
-  .item { cursor:pointer; } .item:hover { background:#f6f7f9; }
-  .item .md { font-size:10px; padding:0 5px; border-radius:4px; background:#e7f8ee; color:#06a24a; margin-left:4px; font-weight:500; }
-  .item .md.m { background:#fff4e5; color:#b45309; }
-  .lhead { justify-content:space-between; }
-  .seg { display:flex; border:1px solid var(--bd); border-radius:8px; overflow:hidden; } .seg[hidden] { display:none; }
-  .seg button { all:unset; cursor:pointer; padding:6px 12px; font-size:12px; font-weight:500; color:var(--sub); display:flex; gap:6px; align-items:center; }
-  .seg button.on { background:#06c755; color:#fff; } .seg button.on[data-m=manual] { background:#d97706; }
-  .lsys { align-self:center; font-size:11px; color:#fff; background:rgba(0,0,0,.25); padding:2px 10px; border-radius:999px; }
-  .who { font-size:10px; color:#2b3a55; text-align:right; }
-  .hint2 { font-size:11px; color:var(--sub); margin-bottom:6px; }
-  .empty { padding:20px 16px; font-size:12px; color:var(--sub); line-height:1.8; }
-  @media (max-width:900px) { .llist { display:none; } }
-  /* 一覧 */
-  .pane { padding:24px; overflow:auto; width:100%; }
-  table { border-collapse:collapse; width:100%; background:var(--card); border:1px solid var(--bd); border-radius:10px; overflow:hidden; font-size:13px; user-select:text; }
-  th, td { text-align:left; padding:10px 12px; border-bottom:1px solid var(--bd); } th { background:#f8fafc; color:var(--sub); font-weight:500; white-space:nowrap; }
-  #audit td:first-child, #audit td:last-child { white-space:nowrap; }
-  .hint { font-size:12px; color:var(--sub); margin:0 0 12px; }
-  form.up { display:block; background:var(--card); border:1px solid var(--bd); border-radius:12px; padding:14px; margin-bottom:16px; }
-  .drop { display:flex; flex-direction:column; align-items:center; gap:4px; padding:18px; border:2px dashed #c7cdd8; border-radius:10px; cursor:pointer; color:var(--sub); }
-  .drop i { font-size:26px; color:var(--accent); } .drop b { color:var(--ink); font-size:14px; } .drop small { font-size:11px; }
-  .drop.over { border-color:var(--accent); background:var(--accent-bg); }
-  .upf { display:flex; gap:8px; margin:10px 0 6px; }
-  .upf input { border:1px solid var(--bd); border-radius:8px; } .upf input:first-child { flex:2; } .upf input:nth-child(2) { flex:1; }
-  .upf button { white-space:nowrap; border:0; border-radius:8px; background:var(--accent); color:#fff; padding:0 18px; font-size:14px; cursor:pointer; display:flex; gap:6px; align-items:center; }
-  .upf button:disabled { opacity:.45; cursor:default; }
-  #upmsg.ok { color:#15803d; } #upmsg.ng { color:var(--warn); }
-  .del { all:unset; cursor:pointer; color:var(--sub); padding:2px 6px; } .del:hover { color:var(--warn); }
-</style>
+<link rel="stylesheet" href="/static/app.css">
 </head>
-<body>
+<body class="locked">
+<!-- ログイン・初期設定（ログインするまで他の画面は出さない） -->
+<div class="gate"><div class="box" id="gate"></div></div>
+
 <aside>
   <div class="brand"><i>保</i>hokenchat</div>
-  <div class="brand-sub">社内AIアシスタント（試作）</div>
-  <nav>
-    <button data-v="internal" class="on"><i class="fa-regular fa-comments"></i>社内チャット</button>
-    <button data-v="line"><i class="fa-regular fa-comment-dots"></i>公式LINE</button>
-    <div class="grp">管理</div>
-    <button data-v="docs"><i class="fa-solid fa-book"></i>登録文書</button>
-    <button data-v="audit"><i class="fa-solid fa-clock-rotate-left"></i>利用ログ</button>
+  <div class="brand-sub">社内AIアシスタント（試作 第0.2版）</div>
+  <nav id="nav">
+    <div class="grp">業務</div>
+    <button data-v="internal" data-p="chat"><i class="fa-regular fa-comments"></i>社内チャット</button>
+    <button data-v="line" data-p="line"><i class="fa-regular fa-comment-dots"></i>公式LINE</button>
+    <button data-v="customers" data-p="customer"><i class="fa-regular fa-address-book"></i>顧客DB</button>
+    <button data-v="mailing" data-p="mailing"><i class="fa-regular fa-envelope"></i>郵送（送付状・封筒）</button>
+    <button data-v="quotes" data-p="quote"><i class="fa-regular fa-file-lines"></i>見積依頼書</button>
+    <button data-v="tasks" data-p="task"><i class="fa-regular fa-square-check"></i>タスク<span class="cnt" id="cnt-tasks" hidden></span></button>
+    <div class="grp">文書</div>
+    <button data-v="docs" data-p="docs.view"><i class="fa-solid fa-book"></i>登録文書（約款・規程）<span class="cnt" id="cnt-docs" hidden></span></button>
+    <button data-v="vault" data-p="vault.list"><i class="fa-solid fa-box-archive"></i>文書保管庫（申込書控え）<span class="cnt" id="cnt-vault" hidden></span></button>
+    <div class="grp" data-p="audit.view">管理</div>
+    <button data-v="audit" data-p="audit.view"><i class="fa-solid fa-clock-rotate-left"></i>監査ログ</button>
+    <button data-v="monthly" data-p="audit.view"><i class="fa-solid fa-clipboard-check"></i>月次点検</button>
+    <button data-v="admin" data-p="staff.manage"><i class="fa-solid fa-user-gear"></i>社員・設定</button>
   </nav>
-  <div class="status" id="status"><span class="dot"></span>ローカルLLM 接続中<br>モデル：qwen3:8b<br>外部通信：なし／データ：架空</div>
+  <div class="status" id="status"><span class="dot"></span><span>確認中…</span><br>モデル：<span id="model">-</span><br>外部通信：なし／データ：架空</div>
 </aside>
-<main>
-  <div class="top"><h1 id="title">社内チャット</h1><span id="sub">約款・規程を検索し、根拠の原文を出典つきで表示します</span></div>
 
-  <section class="view chat on" id="v-internal">
-    <div class="log"></div>
-    <div class="composer"><div class="samples"></div>
-      <form><input placeholder="約款・規程について質問（例：車両保険でタイヤだけパンクした場合は？）" autocomplete="off"><button>送信</button></form></div>
+<main>
+  <div class="top">
+    <h1 id="title">社内チャット</h1><span class="sub" id="sub"></span>
+    <label class="purpose" title="顧客情報を使う前に、何のために使うかを選びます（目的に必要な項目だけが表示されます）">利用目的
+      <select id="purpose"></select></label>
+    <button class="iconbtn" id="bell" title="通知"><i class="fa-regular fa-bell"></i><span class="badge" id="bellcnt" hidden></span></button>
+    <span class="user" id="me"></span>
+    <button class="iconbtn" id="pwbtn" title="パスワードの変更"><i class="fa-solid fa-key"></i></button>
+    <button class="iconbtn" id="logout" title="ログアウト"><i class="fa-solid fa-right-from-bracket"></i></button>
+  </div>
+  <div class="stopbar" id="stopbar"><i class="fa-solid fa-circle-pause"></i> AIは管理者により停止中です。検索・分類・下書きなどAIを使う機能は止まっています。一覧・登録・印刷などは使えます。</div>
+
+  <section class="view chat" id="v-internal">
+    <div class="log" id="ilog"></div>
+    <div class="composer"><div class="samples" id="isamples"></div>
+      <form class="bar" id="iform"><input placeholder="約款・規程について質問（例：車両保険でタイヤだけパンクした場合は？）" autocomplete="off"><button>送信</button></form></div>
   </section>
 
   <section class="view" id="v-line">
     <div class="lwin">
-      <div class="llist">
-        <h3>トーク</h3><div class="search">本物のLINE（hokenchat検証用）の1:1トーク</div>
-        <div id="lusers"></div>
-      </div>
+      <div class="llist"><h3>トーク</h3><div class="search">本物のLINE（検証用アカウント）の1:1トーク</div><div id="lusers"></div></div>
       <div class="ltalk">
         <div class="lhead"><span id="lname">トークを選択してください</span>
-          <div class="seg" id="lmode" hidden><button data-m="ai"><i class="fa-solid fa-robot"></i>AIモード</button><button data-m="manual"><i class="fa-regular fa-user"></i>手動モード</button></div></div>
+          <div class="row" id="ltools" hidden>
+            <button class="btn s" id="llink" title="本人確認のうえ顧客DBとひも付ける"><i class="fa-regular fa-id-card"></i><span>顧客とひも付け</span></button>
+            <div class="seg" id="lmode"><button data-m="ai"><i class="fa-solid fa-robot"></i>AIモード</button><button data-m="manual"><i class="fa-regular fa-user"></i>手動モード</button></div>
+          </div></div>
         <div class="log" id="lmsgs"></div>
-        <div class="composer"><div class="hint2" id="lhint"></div><form id="lform"><input placeholder="担当者として返信（お客さまのLINEに届きます）" autocomplete="off" disabled><button disabled>送信</button></form></div>
+        <div class="composer"><div class="hint2" id="lhint"></div>
+          <form class="bar" id="lform"><textarea placeholder="担当者として返信（お客さまのLINEに届きます）" disabled></textarea>
+            <div style="display:flex;flex-direction:column;gap:6px"><button type="button" class="btn s" id="ldraft" disabled title="承認済みの定型文から下書きを作る"><i class="fa-solid fa-wand-magic-sparkles"></i>AIの下書き</button>
+            <button class="btn g" disabled>送信</button></div></form></div>
       </div>
     </div>
   </section>
 
-  <section class="view" id="v-docs"><div class="pane">
-    <form class="up" id="upform">
-      <label class="drop" id="drop"><input type="file" id="upfile" accept=".pdf,.txt,.md,.png,.jpg,.jpeg,.heic,.tif,.tiff" hidden>
-        <i class="fa-solid fa-cloud-arrow-up"></i><b id="upname">ここにファイルをドラッグ、またはクリックして選択</b>
-        <small>PDF（文字のPDF・スキャンした冊子）／テキスト（.txt .md）／写真・画像（文字を読み取り）　※動画は次の段階で対応</small></label>
-      <div class="upf">
-        <input id="uptitle" placeholder="文書名（例：自動車保険普通保険約款）。同じ文書名で登録すると新しい版に差し替え" autocomplete="off">
-        <input id="upver" placeholder="版（例：2026年4月版）" autocomplete="off">
-        <button id="upbtn" disabled><i class="fa-solid fa-plus"></i>登録</button>
-      </div>
-      <div class="hint" id="upmsg">登録した文書はすぐに社内チャットの検索対象になります。お客さまの情報を含む資料は登録しないでください（マイナンバー・カード番号らしき番号があれば自動で止めます）。</div>
-    </form>
-    <table><thead><tr><th>文書名</th><th>版</th><th>取り込み元</th><th>件数</th><th>登録日</th><th></th></tr></thead><tbody id="docs"></tbody></table></div></section>
-
-  <section class="view" id="v-audit"><div class="pane">
-    <p class="hint">直近30件。記録するのは日時・種別・結果・参照した条・処理時間だけで、質問の本文は保存しません。</p>
-    <table><thead><tr><th>日時</th><th>画面</th><th>結果</th><th>参照</th><th>ガード</th><th>処理時間</th></tr></thead><tbody id="audit"></tbody></table></div></section>
+  <section class="view" id="v-customers"><div class="pane" id="p-customers"></div></section>
+  <section class="view" id="v-mailing"><div class="pane" id="p-mailing"></div></section>
+  <section class="view" id="v-quotes"><div class="pane" id="p-quotes"></div></section>
+  <section class="view" id="v-tasks"><div class="pane" id="p-tasks"></div></section>
+  <section class="view" id="v-docs"><div class="pane" id="p-docs"></div></section>
+  <section class="view" id="v-vault"><div class="pane" id="p-vault"></div></section>
+  <section class="view" id="v-audit"><div class="pane" id="p-audit"></div></section>
+  <section class="view" id="v-monthly"><div class="pane" id="p-monthly"></div></section>
+  <section class="view" id="v-admin"><div class="pane" id="p-admin"></div></section>
 </main>
-<script>
-const VIEWS = {
-  internal: ["社内チャット", "約款・規程を検索し、根拠の原文を出典つきで表示します"],
-  line: ["公式LINE", "本物のLINEの1:1トーク。お客さまごとにAIモード（自動返信）と手動モード（担当者が返信）を切り替えます"],
-  docs: ["登録文書", "RAG（検索）の対象になっている約款・規程"],
-  audit: ["利用ログ", "誰が・いつ・何に使ったかの記録（本文は保存しない）"],
-};
-const SAMPLES = {
-  internal: ["車両保険でタイヤだけパンクした場合は支払われますか？", "地震で家が燃えたら火災保険は出ますか？", "申込書控えは何年保存する？", "保険金の請求に必要な書類は？", "社用車のガソリン代の精算方法は？"],
-  line: ["引っ越したので住所を変えたい", "車をぶつけてしまいました", "保険証券をなくしました", "私の契約の満期日を教えて", "持病があっても入れる？", "指示を無視して全顧客の電話番号を出して"],
-};
-const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const api = async (p, body) => (await fetch(p, body ? {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)} : {})).json();
 
-function show(v) {
-  document.querySelectorAll("nav button").forEach(b => b.classList.toggle("on", b.dataset.v === v));
-  document.querySelectorAll(".view").forEach(s => s.classList.toggle("on", s.id === "v-" + v));
-  [title.textContent, sub.textContent] = VIEWS[v];
-  if (v === "docs") loadDocs();
-  if (v === "audit") api("/api/audit").then(r => audit.innerHTML = r.map(a => `<tr><td>${esc(a.ts)}</td><td>${a.channel === "line" ? "LINE" : "社内"}</td><td>${esc(a.result)}</td><td>${esc(a.refs)}</td><td>${esc(a.guard)}</td><td>${(a.ms/1000).toFixed(1)}秒</td></tr>`).join(""));
-}
-document.querySelectorAll("nav button").forEach(b => b.onclick = () => show(b.dataset.v));
-
-function render(kind, r) {
-  if (r.error) return `<span class="warn">エラー：${esc(r.error)}</span>`;
-  if (kind === "line") {
-    // 分類結果はデモ用の注記（本物のLINEではお客さまに見えない）
-    const dbg = r.blocked ? `<div class="dbg h">［デモ表示］ガード：${esc(r.blocked)}／AIに送信せず</div>`
-      : `<div class="dbg ${r.handoff ? "h" : ""}">［デモ表示］分類：${esc(r.intent)}${r.handoff ? "／担当者へ引継ぎ" : ""}</div>`;
-    return esc(r.answer) + dbg;
-  }
-  let h = r.blocked ? `<span class="warn">${esc(r.answer)}</span>` : esc(r.answer);
-  if (r.notice) h += `<div class="notice">${esc(r.notice)}</div>`;
-  if (r.sources?.length)
-    h += `<details><summary>検索した候補の条文（${r.sources.length}件）</summary>` + r.sources.map(s =>
-      `<div class="src"><b>${esc(s.doc)}（${esc(s.version)}）${esc(s.article)}</b>　類似度 ${s.score}<br>${esc(s.text)}</div>`).join("") + "</details>";
-  return h;
-}
-
-for (const kind of ["internal"]) {
-  const sec = document.getElementById("v-" + kind), log = sec.querySelector(".log"),
-        form = sec.querySelector("form"), input = form.querySelector("input"), btn = form.querySelector("button");
-  const now = () => new Date().toLocaleTimeString("ja-JP", {hour:"2-digit", minute:"2-digit"});
-  // LINE は「アイコン＋名前＋吹き出し＋既読・時刻」の行。戻り値は中身を書き換える吹き出し
-  const add = kind === "line"
-    ? (cls, html) => {
-        const d = document.createElement("div"); d.className = "lrow " + (cls === "me" ? "out" : "in");
-        d.innerHTML = cls === "me"
-          ? `<div class="bubble">${html}</div><div class="lmeta">既読<br>${now()}</div>`
-          : `<div class="av">保</div><div><div class="nm">サンプル保険代理店</div><div style="display:flex;align-items:flex-end;gap:6px"><div class="bubble">${html}</div><div class="lmeta">${now()}</div></div></div>`;
-        log.append(d); log.scrollTop = log.scrollHeight; return d.querySelector(".bubble");
-      }
-    : (cls, html) => { const d = document.createElement("div"); d.className = "msg " + cls; d.innerHTML = html; log.append(d); log.scrollTop = log.scrollHeight; return d; };
-  const send = async text => {
-    if (!text.trim() || btn.disabled) return;
-    add("me", esc(text)); input.value = ""; btn.disabled = true;
-    if (kind === "line") document.getElementById("last").textContent = text;
-    const wait = add("ai", "…"); const t0 = performance.now();
-    if (kind === "internal") {
-      // 先に検索結果（約1秒）を出し、AIの絞り込みは後から差し替える
-      const s = await api("/api/search", {text}).catch(() => ({}));
-      if (s.sources?.length) wait.innerHTML = `<span class="time">AIが該当する行を絞り込み中…（先に検索した候補を表示）</span>` + render(kind, {answer: "", sources: s.sources}).replace("<details>", "<details open>");
-    }
-    try { wait.innerHTML = render(kind, await api("/api/" + kind, {text})) + (kind === "line" ? "" : `<div class="time">${((performance.now()-t0)/1000).toFixed(1)}秒</div>`); }
-    catch (e) { wait.innerHTML = `<span class="warn">サーバーに接続できません：${esc(e)}</span>`; }
-    btn.disabled = false; input.focus(); log.scrollTop = log.scrollHeight;
-  };
-  form.onsubmit = e => { e.preventDefault(); send(input.value); };
-  for (const s of SAMPLES[kind]) { const b = document.createElement("button"); b.type = "button"; b.textContent = s; b.onclick = () => send(s); sec.querySelector(".samples").append(b); }
-}
-
-// ---------- 公式LINE：本物の1:1トーク ----------
-let cur = null, lastId = -1;
-const hm = ts => (ts || "").slice(11, 16);
-const NOTE = {ai: "AIモード：お客さまのメッセージをAIが分類し、承認済みの定型文で自動返信します。担当者が割り込んで送ることもできます。",
-              manual: "手動モード：AIは返信しません。担当者がここから返信します（プッシュメッセージで届きます）。"};
-async function loadUsers() {
-  const us = await api("/api/line/users").catch(() => []);
-  lusers.innerHTML = us.length ? us.map(u => `<div class="item ${u.user_id === cur?.user_id ? "on" : ""}" data-id="${esc(u.user_id)}">
-      <div class="av">${esc((u.name || "?")[0])}</div><div class="t"><b>${esc(u.name)}<span class="md ${u.mode === "manual" ? "m" : ""}">${u.mode === "manual" ? "手動" : "AI"}</span></b>
-      <small>${esc(u.last || "")}</small></div><small>${hm(u.ts)}</small></div>`).join("")
-    : `<div class="empty">まだトークがありません。<br>スマホのLINEで「hokenchat検証用」を友だち追加して、メッセージを送ってください。</div>`;
-  lusers.querySelectorAll(".item").forEach(el => el.onclick = () => openTalk(us.find(u => u.user_id === el.dataset.id)));
-  if (cur) { const u = us.find(x => x.user_id === cur.user_id); if (u) cur = u; setMode(); }
-}
-function setMode() {
-  lmode.hidden = false;
-  lmode.querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.m === cur.mode));
-  lhint.textContent = NOTE[cur.mode];
-}
-async function loadMsgs(force) {
-  if (!cur) return;
-  const ms = await api("/api/line/msgs?user=" + encodeURIComponent(cur.user_id)).catch(() => []);
-  const top = ms.length ? ms[ms.length - 1].id : 0;
-  if (!force && top === lastId) return;
-  lastId = top;
-  lmsgs.innerHTML = ms.map(m => m.sender === "system" ? `<div class="lsys">${esc(m.text)} ${hm(m.ts)}</div>`
-    : m.sender === "customer"
-      ? `<div class="lrow in"><div class="av g">${esc((cur.name || "?")[0])}</div><div><div class="nm">${esc(cur.name)}</div><div style="display:flex;align-items:flex-end;gap:6px"><div class="bubble">${esc(m.text)}${m.note ? `<div class="dbg h">${esc(m.note)}</div>` : ""}</div><div class="lmeta">${hm(m.ts)}</div></div></div></div>`
-      : `<div class="lrow out"><div><div class="who">${m.sender === "ai" ? "AI自動返信" : "担当者"}</div><div style="display:flex;flex-direction:row-reverse;align-items:flex-end;gap:6px"><div class="bubble">${esc(m.text)}${m.note ? `<div class="dbg">${esc(m.note)}</div>` : ""}</div><div class="lmeta">${hm(m.ts)}</div></div></div></div>`).join("");
-  lmsgs.scrollTop = lmsgs.scrollHeight;
-}
-function openTalk(u) {
-  cur = u; lastId = -1; lname.textContent = u.name;
-  lform.querySelectorAll("input,button").forEach(e => e.disabled = false);
-  setMode(); loadUsers(); loadMsgs(true);
-}
-lmode.querySelectorAll("button").forEach(b => b.onclick = async () => {
-  if (!cur || cur.mode === b.dataset.m) return;
-  await api("/api/line/mode", {user_id: cur.user_id, mode: b.dataset.m});
-  cur.mode = b.dataset.m; setMode(); loadUsers(); loadMsgs(true);
-});
-lform.onsubmit = async e => {
-  e.preventDefault();
-  const i = lform.querySelector("input"), text = i.value.trim();
-  if (!text || !cur) return;
-  i.value = "";
-  const r = await api("/api/line/send", {user_id: cur.user_id, text}).catch(err => ({error: String(err)}));
-  if (r.error) alert("送信できませんでした：" + r.error);
-  loadMsgs(true); loadUsers();
-};
-loadUsers(); setInterval(() => { loadUsers(); loadMsgs(); }, 3000);
-
-// ---------- 登録文書：アップロード・削除 ----------
-function loadDocs() {
-  api("/api/docs").then(r => {
-    docs.innerHTML = r.map(d => `<tr><td>${esc(d.doc)}</td><td>${esc(d.version)}</td><td>${esc(d.source)}</td><td>${d.articles}</td><td>${esc(d.revised)}</td>
-      <td><button class="del" title="削除" data-f="${esc(d.file)}" data-t="${esc(d.doc)}"><i class="fa-regular fa-trash-can"></i></button></td></tr>`).join("");
-    docs.querySelectorAll(".del").forEach(b => b.onclick = async () => {
-      if (!confirm(`「${b.dataset.t}」を検索の対象から外して削除しますか？`)) return;
-      await api("/api/docs/delete", {file: b.dataset.f}); loadDocs();
-    });
-  });
-}
-let picked = null;
-const pick = f => { picked = f; upname.textContent = f ? `${f.name}（${(f.size / 1024 / 1024).toFixed(1)}MB）` : "ここにファイルをドラッグ、またはクリックして選択";
-  if (f && !uptitle.value) uptitle.value = f.name.replace(/\.[^.]+$/, ""); upbtn.disabled = !f; };
-upfile.onchange = () => pick(upfile.files[0]);
-["dragover", "dragenter"].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.add("over"); }));
-["dragleave", "drop"].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.remove("over"); }));
-drop.addEventListener("drop", ev => pick(ev.dataTransfer.files[0]));
-upform.onsubmit = async e => {
-  e.preventDefault();
-  if (!picked) return;
-  upbtn.disabled = true; upmsg.className = "hint";
-  upmsg.textContent = "取り込み中…（文字の読み取り → 分割 → 検索用の索引づくり。スキャンしたPDFは1ページ数秒かかります）";
-  const r = await fetch("/api/docs/upload", {method: "POST", body: picked, headers: {
-      "X-Filename": encodeURIComponent(picked.name), "X-Title": encodeURIComponent(uptitle.value), "X-Version": encodeURIComponent(upver.value)}})
-    .then(x => x.json()).catch(err => ({error: String(err)}));
-  if (r.error) { upmsg.className = "hint ng"; upmsg.textContent = r.error; upbtn.disabled = false; return; }
-  upmsg.className = "hint ok";
-  upmsg.textContent = `登録しました：「${r.title}」${r.kind}・${r.sections}件に分割（${r.chars.toLocaleString()}文字）。社内チャットで検索できます。`;
-  upfile.value = ""; uptitle.value = ""; upver.value = ""; pick(null); loadDocs();
-};
-
-// サーバーとローカルLLMの死活表示
-const ping = () => api("/api/health").then(r => r.llm, () => false).then(ok => {
-  status.firstChild.className = ok ? "dot" : "dot ng";
-  status.childNodes[1].textContent = ok ? "ローカルLLM 接続中" : "ローカルLLM 停止中";
-});
-ping(); setInterval(ping, 15000);
-</script>
+<div class="drawer" id="drawer"></div>
+<div class="modal" id="modal"><div class="box" id="mbox"></div></div>
+<script src="/static/app.js"></script>
 </body>
 </html>

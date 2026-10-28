@@ -3,6 +3,10 @@
 data/hokenchat.db
 data/hokenchat.db-*
 data/uploads/
+data/vault/
+data/line_files/
+data/keys/
+data/inbox/
 data/logs/
 line_friend_qr.png
 
