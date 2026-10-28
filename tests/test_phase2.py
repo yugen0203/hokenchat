@@ -78,6 +78,7 @@ class Client:
         s, t = self.req("/api/login", {"login": login, "password": pw})
         assert s == 200, t
         secret = t.get("secret") or auth.db.one("SELECT mfa_secret FROM staff WHERE login=?", login)["mfa_secret"]
+        auth._used.clear()  # テストは30秒以内に何度もログインするので、使い回し拒否の記録を消す（本番では消さない）
         s, r = self.req("/api/login/code", {"ticket": t["ticket"], "code": auth.totp(secret)})
         assert s == 200, r
         return self
@@ -201,19 +202,77 @@ class T(unittest.TestCase):
 
     # ---- 見積依頼書 ----
     def test_quotes(self):
-        q = self.admin.req("/api/quotes/draft", {"text": "架空一郎さん 12月1日始期 プリウスの見積", "kind": "自動車"})[1]
+        c = Client().login("admin", "Admin12345")  # 利用目的は端末（ログイン）ごと
+        self.assertEqual(c.req("/api/quotes/draft", {"text": "架空一郎さん プリウス", "kind": "自動車"})[0], 428)  # 目的なしは不可
+        c.req("/api/purpose", {"purpose": "見積依頼"})
+        r = c.req("/api/quotes/draft", {"text": "架空一郎さんは骨折で通院中。傷害保険の見積", "kind": "その他"})[1]
+        self.assertIn("blocked", json.dumps(r, ensure_ascii=False) + str(r.get("error", "")))   # 病名・けがはAIに送らない
+        q = c.req("/api/quotes/draft", {"text": "架空一郎さん 12月1日始期 プリウスの見積", "kind": "自動車"})[1]
         self.assertEqual(q["fields"]["car_model"], "")                          # 原文にない型式は捨てる
         self.assertEqual(q["fields"]["start"], "2026-12-01")
         self.assertIn("型式", q["missing"])
-        self.assertEqual(self.admin.req("/api/quotes/approve", {"id": q["id"]})[0], 400)
+        self.assertEqual(c.req("/api/quotes/approve", {"id": q["id"]})[0], 400)
         fields = {f["key"]: (q["fields"][f["key"]] or "テスト値") for f in q["template"]}
-        self.admin.req("/api/quotes/update", {"id": q["id"], "fields": fields})
-        self.assertEqual(self.admin.req("/api/quotes/approve", {"id": q["id"]})[1]["status"], "承認済")
-        self.assertTrue(self.admin.req(f"/api/quotes/sheet?id={q['id']}")[1].startswith(b"%PDF"))
-        r = self.admin.req("/api/quotes/reconcile", {"id": q["id"], "text": " ".join(fields.values())})[1]
+        c.req("/api/quotes/update", {"id": q["id"], "fields": fields})
+        self.assertEqual(c.req("/api/quotes/approve", {"id": q["id"]})[1]["status"], "承認済")
+        self.assertTrue(c.req(f"/api/quotes/sheet?id={q['id']}")[1].startswith(b"%PDF"))
+        r = c.req("/api/quotes/reconcile", {"id": q["id"], "text": " ".join(fields.values())})[1]
         self.assertEqual(r["status"], "突合済")
-        r = self.admin.req("/api/quotes/reconcile", {"id": q["id"], "text": "まったく別の内容"})[1]
+        r = c.req("/api/quotes/reconcile", {"id": q["id"], "text": "まったく別の内容"})[1]
         self.assertEqual(r["status"], "差異あり")
+        self.assertIn("error", c.req("/api/quotes/close", {"id": q["id"], "won": True})[1])   # 成約は控えの文書IDが必須
+
+    # ---- レビュー指摘の修正（第0.2.1版） ----
+    def test_zy_review_fixes(self):
+        # Host ヘッダの確認（DNS リバインディング対策）
+        self.assertEqual(Client().req("/api/me", headers={"Host": f"evil.example:{srv.server_port}"})[0], 421)
+        # 確認コードは5回間違えると、そのログインは無効（総当たり対策）。同じコードの使い回しも不可
+        auth.create_staff("ttest", "テスト 確認", "clerk", "Tt12345678", must_change=False)
+        c = Client()
+        s, t = c.req("/api/login", {"login": "ttest", "password": "Tt12345678"})
+        for _ in range(5):
+            c.req("/api/login/code", {"ticket": t["ticket"], "code": "000000"})
+        self.assertEqual(c.req("/api/login/code", {"ticket": t["ticket"], "code": auth.totp(t["secret"])})[0], 401)
+        auth._fails.clear()
+        s, t = c.req("/api/login", {"login": "ttest", "password": "Tt12345678"})
+        code = auth.totp(t["secret"])
+        auth._used.clear()
+        self.assertEqual(c.req("/api/login/code", {"ticket": t["ticket"], "code": code})[0], 200)
+        s, t = Client().req("/api/login", {"login": "ttest", "password": "Tt12345678"})
+        self.assertEqual(Client().req("/api/login/code", {"ticket": t["ticket"], "code": code})[0], 401)  # 使い回し
+        # LINE 受付サーバーの送信口：合言葉と JSON がなければ拒否
+        import line_webhook
+        ps = ThreadingHTTPServer(("127.0.0.1", 0), line_webhook.Push)
+        threading.Thread(target=ps.serve_forever, daemon=True).start()
+        for h in ({"Content-Type": "application/json"}, {"Content-Type": "text/plain", "X-Internal-Token": app.internal_token()}):
+            r = urllib.request.Request(f"http://127.0.0.1:{ps.server_port}/push", b'{"to":"U1","text":"x"}', h)
+            with self.assertRaises(urllib.error.HTTPError) as e:
+                urllib.request.urlopen(r)
+            self.assertEqual(e.exception.code, 403)
+        ps.shutdown()
+        # 種目を後から変えて満了日が過去になっても、14日は削除しない（事前通知を出してから消す）
+        today = dt.date.today()
+        late = vault.register("e.pdf", b"%PDF-late", None, "控え5", [], {"id": 1}, registered=dt.date(2019, 1, 1))
+        s, q = self.jimu.req("/api/vault/request", {"copy_id": late["id"], "type": "kind", "kinds": ["自動車"]})
+        self.admin.req("/api/vault/decide", {"id": q["id"], "approve": True})
+        vault.run_daily(now=today)
+        self.assertTrue(db.one("SELECT 1 FROM application_copy WHERE id=?", late["id"]))
+        self.assertGreaterEqual(vault.run_daily(now=today + dt.timedelta(days=1))["notice"], 0)
+        vault.run_daily(now=today + dt.timedelta(days=14))
+        self.assertFalse(db.one("SELECT 1 FROM application_copy WHERE id=?", late["id"]))
+        # ホールドの申請が承認待ちのまま満了しても、申請ごと消さない
+        pend = vault.register("f.pdf", b"%PDF-pend", None, "控え6", ["自動車"], {"id": 1}, registered=dt.date(2020, 1, 1))
+        self.jimu.req("/api/vault/request", {"copy_id": pend["id"], "type": "hold", "reason": "H1"})
+        vault.run_daily(now=today)
+        self.assertTrue(db.one("SELECT 1 FROM application_copy WHERE id=?", pend["id"]))
+        self.assertIn("job（運用責任者ID", db.one("SELECT executor FROM deletion_log WHERE copy_id=?", late["id"])["executor"])
+        # 監査ログ：末尾の行を消されても検出する
+        audit.log("test_tail")
+        last = dict(db.one("SELECT * FROM audit_log ORDER BY id DESC LIMIT 1"))
+        db.run("DELETE FROM audit_log WHERE id=?", last["id"])
+        self.assertFalse(audit.verify()["ok"])
+        db.run(f"INSERT INTO audit_log({','.join(last)}) VALUES({','.join('?' * len(last))})", *last.values())
+        self.assertTrue(audit.verify()["ok"])
 
     # ---- 監査ログ・停止スイッチ ----
     def test_zz_audit_and_switch(self):

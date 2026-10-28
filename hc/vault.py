@@ -165,6 +165,9 @@ def decide(rid, approve, staff, *, now=None):
         exp = expires_for(dt.date.fromisoformat(r["registered"]), p["kinds"])  # 元の登録日から再計算
         db.run("UPDATE application_copy SET kinds=?, expires=?, notice14=0, notice1=0 WHERE id=?", _kinds_str(p["kinds"]),
                exp.isoformat() if exp else None, r["id"])
+        # 変更後の満了日が過去・目前なら、事前通知（14日前・前日）を出せるよう削除を最低14日繰り延べる（F-15）
+        floor = t + dt.timedelta(days=14)
+        db.set_setting(f"defer:{r['id']}", floor.isoformat() if exp and exp < floor else "")
         db.run("INSERT INTO kind_change_log(copy_id,before,after,requested_by,approved_by) VALUES(?,?,?,?,?)",
                r["id"], r["kinds"], _kinds_str(p["kinds"]), q["requested_by"], staff["id"])
     elif q["type"] == "hold":
@@ -181,10 +184,15 @@ def run_daily(*, now=None, executor="job"):
     t = now or today()
     job = f"J{t:%Y%m%d}-{secrets.token_hex(3)}"
     out = {"job_id": job, "date": t.isoformat(), "notice": 0, "deleted": 0, "failed": 0, "held": 0, "unset": 0}
-    copies = db.rows("SELECT * FROM application_copy")
+    copies = [dict(r) for r in db.rows("SELECT * FROM application_copy")]
+    for r in copies:  # 削除してよい日＝満了日と繰り延べ日の遅いほう
+        r["due"] = max(filter(None, [r["expires"], db.setting(f"defer:{r['id']}")]), default=None)
+    resp = db.one("SELECT id FROM staff WHERE role='admin' AND active=1 ORDER BY id")
+    if executor == "job" and resp:  # 自動ジョブは運用責任者（最初の有効な管理者）のIDも残す（F-17）
+        executor = f"job（運用責任者ID {resp['id']}）"
     # 1) 事前通知（満了14日前と前日。文書ID・種目・登録日・満了日だけを載せる）
     for days, col in ((14, "notice14"), (1, "notice1")):
-        due = [r for r in copies if r["expires"] and not r["legal_hold"] and not r[col] and 0 < _days_left(r["expires"], t) <= days]
+        due = [r for r in copies if r["due"] and not r["legal_hold"] and not r[col] and 0 < _days_left(r["due"], t) <= days]
         if due:
             body = "\n".join(f"文書ID {r['id']}／{r['kinds']}／登録 {r['registered']}／満了 {r['expires']}" for r in due)
             audit.notify(f"申込書控えの削除予定（{'前日' if days == 1 else '14日前'}）：{len(due)}件", body, roles="all",
@@ -203,10 +211,17 @@ def run_daily(*, now=None, executor="job"):
         if not r["expires"]:
             out["unset"] += 1
             continue
-        if r["expires"] <= t.isoformat():
+        if r["due"] <= t.isoformat() and db.one("SELECT 1 FROM copy_request WHERE copy_id=? AND type='hold' AND status='pending'", r["id"]):
+            # ホールドの申請が承認待ちのまま満了した：申請ごと消さず、判断が出るまで保留する
+            out["held"] += 1
+            audit.notify("リーガルホールドの申請が承認待ちのため、削除を保留しています", f"文書ID {r['id']}（満了 {r['expires']}）。申請を承認または否認してください",
+                         level="warn", roles="admin", key=f"pendinghold:{r['id']}:{t}")
+            continue
+        if r["due"] <= t.isoformat():
             ok = crypto.erase(r["ref"], VAULT)
             db.run("DELETE FROM copy_request WHERE copy_id=? AND status='pending'", r["id"])
             db.run("DELETE FROM application_copy WHERE id=?", r["id"])
+            db.set_setting(f"defer:{r['id']}", "")
             # 文書IDにひも付く派生データ（見積依頼書の成約ひも付け等）も同じ満了日で消す
             db.run("DELETE FROM quote WHERE contract_copy_id=?", r["id"])
             ok = ok and not db.one("SELECT 1 FROM application_copy WHERE id=?", r["id"])

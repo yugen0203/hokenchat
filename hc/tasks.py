@@ -27,7 +27,7 @@ def _valid(b):
         return None, "件名を入れてください"
     detail = str(b.get("detail") or "").strip()[:2000]
     for v in (title, detail):
-        if g := guard(v, internal=True):
+        if g := guard(v):
             return None, f"入力できない情報があります（{g}）"
     due = str(b.get("due") or "").strip()
     if due:
@@ -69,7 +69,7 @@ def update(tid, b, staff):
 
 def propose(text, staff):
     """依頼文からタスク案を作る（保存しない）"""
-    if g := guard(text, internal=True):
+    if g := guard(text):
         return {"blocked": g, "error": f"送信を止めました：{g}"}
     people = {s["name"]: s["id"] for s in db.rows("SELECT id,name FROM staff WHERE active=1")}
     today = dt.date.today()

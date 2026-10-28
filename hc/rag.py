@@ -5,7 +5,7 @@
 フォルダ監視（D-04）: data/inbox/ に置いたファイルを定期的に見て、新しいもの・中身が変わったものを「承認待ち」で取り込む
 社内チャット: 検索 → LLM は「どの行が関係するか」の番号を選ぶだけ → 表示はコードが原文から取り出す（逆の結論を出さない）
 """
-import hashlib, json, math, re, shutil, subprocess, sys, threading, time
+import hashlib, json, math, re, shutil, subprocess, sys, threading, time, urllib.error
 from pathlib import Path
 from . import db, llm, audit
 from .guard import guard, number_guard
@@ -266,6 +266,10 @@ def scan_inbox():
             try:
                 r = register(f.name, data, title, version, "未設定", None, via="フォルダ監視")
             except llm.AIStopped:
+                return n
+            except (urllib.error.URLError, ConnectionError, TimeoutError) as e:
+                # Ollama の起動待ちなど一時的な失敗は記録せず、次回（1分後）にもう一度試す
+                print("フォルダ監視：一時的に取り込めません（次回に再試行）:", f.name, e)
                 return n
             except Exception as e:
                 r = {"error": str(e)}

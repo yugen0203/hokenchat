@@ -43,8 +43,10 @@ def _filter(c, allowed, pols=None):
 
 def search(q, allowed, staff, limit=50):
     q = (q or "").strip()
+    # 電話番号で探せるのは、利用目的で電話番号を見られる人だけ（見えない項目で探れないようにする）
+    phone = f"%{q}%" if "phone" in allowed else "\x00"
     rs = db.rows("""SELECT * FROM customer WHERE (?='' OR name LIKE ? OR kana LIKE ? OR phone LIKE ? OR CAST(id AS TEXT)=?)
-                    ORDER BY id DESC LIMIT ?""", q, f"%{q}%", f"%{q}%", f"%{q}%", q, limit)
+                    ORDER BY id DESC LIMIT ?""", q, f"%{q}%", f"%{q}%", phone, q, limit)
     audit.log("customer_search", staff=staff, channel="customer", result=len(rs))
     return [_filter(c, allowed) for c in rs]
 

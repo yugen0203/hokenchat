@@ -9,7 +9,7 @@ from . import db, audit
 from .config import ROLES, PERMS, PURPOSES, PURPOSES_OTHER, SESSION_HOURS
 
 ISSUER = "hokenchat"
-_tickets, _fails = {}, {}
+_tickets, _fails, _used = {}, {}, {}  # _used: 社員ごとに最後に使った確認コードの時刻枠（使い回しを拒否）
 _lock = threading.Lock()
 
 
@@ -55,10 +55,18 @@ def totp(secret, t=None, step=30, digits=6):
     return str((struct.unpack(">I", h[o:o + 4])[0] & 0x7FFFFFFF) % 10 ** digits).zfill(digits)
 
 
-def check_totp(secret, code):
+def totp_step(secret, code):
+    """一致した時刻枠（30秒ごとの番号）を返す。一致しなければ None。前後1枠のずれまで許す"""
     code = "".join(ch for ch in str(code) if ch.isdigit())
     now = time.time()
-    return any(hmac.compare_digest(totp(secret, now + d * 30), code) for d in (-1, 0, 1))
+    for d in (-1, 0, 1):
+        if hmac.compare_digest(totp(secret, now + d * 30), code):
+            return int((now + d * 30) // 30)
+    return None
+
+
+def check_totp(secret, code):
+    return totp_step(secret, code) is not None
 
 
 def otpauth_uri(login, secret):
@@ -128,6 +136,8 @@ def change_password(staff, old, new):
     if old == new:
         raise AuthError("新しいパスワードは今と違うものにしてください", 400)
     db.run("UPDATE staff SET pw_hash=?, must_change=0 WHERE id=?", hash_pw(new), s["id"])
+    # 他の端末に残っているログインは無効にする（今の画面だけ残す）
+    db.run("DELETE FROM sessions WHERE staff_id=? AND token_hash<>?", s["id"], staff.get("token_hash", ""))
 
 
 # ---------- ログイン ----------
@@ -163,10 +173,21 @@ def login_code(ticket, code):
         t = _tickets.get(ticket)
     if not t or t["exp"] < time.time():
         raise AuthError("時間切れです。もう一度ログインしてください")
-    if not check_totp(t["secret"], code):
+    step = totp_step(t["secret"], code)
+    if step is None or step <= _used.get(t["sid"], -1):  # 一度使ったコードは同じ時間内でも使えない
+        s = db.one("SELECT login FROM staff WHERE id=?", t["sid"])
+        with _lock:
+            t["tries"] = t.get("tries", 0) + 1
+            if t["tries"] >= 5:  # 総当たり対策：5回間違えたらこのログインは無効。パスワードからやり直し
+                _tickets.pop(ticket, None)
+            if s:  # パスワードの失敗と同じ数え方で、続けば15分ロック
+                n = _fails.get(s["login"], (0, 0))[0] + 1
+                _fails[s["login"]] = (n, time.time())
         audit.log("login_fail", channel="auth", result="mfa", staff={"id": t["sid"]})
-        raise AuthError("確認コードが違います（端末の時刻がずれていないかも確認してください）")
+        raise AuthError("確認コードが違います（端末の時刻がずれていないかも確認してください）"
+                        + ("。5回間違えたため、もう一度パスワードから入れてください" if t["tries"] >= 5 else ""))
     with _lock:
+        _used[t["sid"]] = step
         _tickets.pop(ticket, None)
         s = db.one("SELECT login FROM staff WHERE id=?", t["sid"])
         _fails.pop(s["login"] if s else "", None)

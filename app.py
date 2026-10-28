@@ -8,7 +8,7 @@
 起動: python app.py（ふつうはアイコン＝launcher.py から）
 初期文書の取り込みだけ: python app.py --ingest-only
 """
-import json, secrets, sys, threading, time, traceback, urllib.parse
+import json, os, secrets, sys, threading, time, traceback, urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -38,8 +38,12 @@ def internal_token():
     KEYS.mkdir(parents=True, exist_ok=True)
     f = KEYS / "internal.token"
     if not f.exists():
-        f.write_text(secrets.token_urlsafe(32))
-    return f.read_text().strip()
+        f.write_text(secrets.token_urlsafe(32), encoding="utf-8")
+        try:
+            os.chmod(f, 0o600)  # 本人だけが読める（Windows では無視される）
+        except OSError:
+            pass
+    return f.read_text(encoding="utf-8").strip()
 
 
 def meta():
@@ -217,6 +221,8 @@ def _line_draft(r):
 
 @route("POST", "/api/line/link", "line", purpose=True)
 def _line_link(r):
+    if r.staff.get("purpose") != "お客さま対応":
+        raise AuthError("LINEのお客さまとひも付けるには、利用目的「お客さま対応」を選んでください", 428)
     return line.link(r.body, r.staff)
 
 
@@ -267,7 +273,7 @@ def _vault_upload(r):
     return vault.register(r.h("X-Filename"), r.raw, cid, r.h("X-Title"), kinds, r.staff)
 
 
-@route("GET", "/api/vault/file", "vault.view")
+@route("GET", "/api/vault/file", "vault.view", purpose=True)
 def _vault_file(r):
     data, mime = vault.view(int(r.q("id")), r.staff)
     return File(data, mime) if data else {"error": "見つかりません（削除済みの可能性があります）"}
@@ -353,43 +359,43 @@ def _sender_set(r):
 
 
 # ================= 見積依頼書 =================
-@route("GET", "/api/quotes", "quote")
+@route("GET", "/api/quotes", "quote", purpose=True)
 def _quotes(r):
     return quotes.listing()
 
 
-@route("GET", "/api/quote", "quote")
+@route("GET", "/api/quote", "quote", purpose=True)
 def _quote(r):
     return quotes.get(int(r.q("id")))
 
 
-@route("POST", "/api/quotes/draft", "quote")
+@route("POST", "/api/quotes/draft", "quote", purpose=True)
 def _quote_draft(r):
     return quotes.draft(str(r.body.get("text") or ""), r.body.get("kind"), r.staff)
 
 
-@route("POST", "/api/quotes/update", "quote")
+@route("POST", "/api/quotes/update", "quote", purpose=True)
 def _quote_update(r):
     return quotes.update(int(r.body["id"]), r.body.get("fields") or {}, r.staff)
 
 
-@route("POST", "/api/quotes/approve", "quote")
+@route("POST", "/api/quotes/approve", "quote", purpose=True)
 def _quote_approve(r):
     return quotes.approve(int(r.body["id"]), r.staff)
 
 
-@route("POST", "/api/quotes/reconcile", "quote")
+@route("POST", "/api/quotes/reconcile", "quote", purpose=True)
 def _quote_reconcile(r):
     return quotes.reconcile(int(r.body["id"]), str(r.body.get("text") or ""), r.staff)
 
 
-@route("POST", "/api/quotes/close", "quote")
+@route("POST", "/api/quotes/close", "quote", purpose=True)
 def _quote_close(r):
     cid = r.body.get("copy_id")
     return quotes.close(int(r.body["id"]), bool(r.body.get("won")), int(cid) if str(cid or "").isdigit() else None, r.staff)
 
 
-@route("GET", "/api/quotes/sheet", "quote")
+@route("GET", "/api/quotes/sheet", "quote", purpose=True)
 def _quote_sheet(r):
     data = quotes.jnet_sheet(int(r.q("id")), r.staff)
     return File(data, "application/pdf", "jnet_input.pdf") if data else {"error": "承認済の見積依頼書だけ入力票を作れます"}
@@ -522,6 +528,10 @@ class H(BaseHTTPRequestHandler):
         return self._send(404, {"error": "not found"})
 
     def _handle(self, method):
+        # DNS リバインディング対策：「127.0.0.1」に見せかけた外部サイトからの通信を拒否する（Host を自分の名前に限る）
+        port = self.server.server_address[1]
+        if self.headers.get("Host", "") not in (f"127.0.0.1:{port}", f"localhost:{port}"):
+            return self._send(421, {"error": "misdirected request"})
         u = urllib.parse.urlsplit(self.path)
         if not u.path.startswith("/api/"):
             return self._static(u.path) if method == "GET" else self._send(404, {"error": "not found"})

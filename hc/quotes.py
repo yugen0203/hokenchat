@@ -36,7 +36,7 @@ SYSTEM = """あなたは保険代理店の見積依頼書の入力補助です�
 
 def draft(text, kind, staff, customer_id=None):
     tpl = templates()
-    if g := guard(text, internal=True):
+    if g := guard(text):
         audit.log("quote_draft", staff=staff, channel="quote", result="blocked", guard=g)
         return {"blocked": g, "error": f"送信を止めました：{g}。この情報はAIに入力できません"}
     if kind not in tpl:
@@ -95,7 +95,7 @@ def update(qid, fields, staff):
     keys = [f["key"] for f in q["template"]]
     new = {k: str(fields.get(k, q["fields"].get(k, "")) or "").strip()[:200] for k in keys}
     for k, v in new.items():
-        if g := guard(v, internal=True):
+        if g := guard(v):
             return {"error": f"入力できない情報があります（{g}）"}
     db.run("UPDATE quote SET fields=?, status='下書き', approved_by=NULL, reconcile=NULL, updated_at=datetime('now','localtime') WHERE id=?",
            json.dumps(new, ensure_ascii=False), qid)
@@ -145,7 +145,7 @@ def reconcile(qid, jnet_text, staff):
         return q
     if q["status"] not in ("承認済", "突合済", "差異あり"):
         return {"error": "承認済の見積依頼書だけ突合できます"}
-    if g := guard(jnet_text, internal=True):
+    if g := guard(jnet_text):
         return {"error": f"貼り付けた文字に入力できない情報があります（{g}）"}
     t, td = _norm(jnet_text), re.sub(r"\D", "", jnet_text)
     res = []
@@ -165,7 +165,9 @@ def reconcile(qid, jnet_text, staff):
 
 def close(qid, won, copy_id, staff):
     """成約なら申込書控え（文書保管庫）の文書IDにひも付け、その保存期間に従う。不成約は作成から1年で自動削除"""
-    if won and copy_id and not db.one("SELECT 1 FROM application_copy WHERE id=?", copy_id):
+    if won and not copy_id:  # ひも付けないと控えの保存期間で消えず、永久に残ってしまう（N-16）
+        return {"error": "成約にするには、申込書控え（文書保管庫）の文書IDを指定してください"}
+    if won and not db.one("SELECT 1 FROM application_copy WHERE id=?", copy_id):
         return {"error": "申込書控えの文書IDが見つかりません"}
     db.run("UPDATE quote SET status=?, contract_copy_id=? WHERE id=?", "成約" if won else "不成約", copy_id if won else None, qid)
     audit.log("quote_close", staff=staff, channel="quote", refs=f"q{qid}", result="成約" if won else "不成約")

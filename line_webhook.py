@@ -18,7 +18,9 @@ ROOT = Path(__file__).parent
 APP = "http://127.0.0.1:8765/api/line/incoming"
 LINE_API = "https://api.line.me/v2/bot"
 LINE_DATA = "https://api-data.line.me/v2/bot"   # 画像・ファイルの中身を取る口
-TOKEN_FILE = ROOT / "data" / "keys" / "internal.token"  # 本体が作る合言葉（同じ PC の中だけで使う）
+import os  # noqa: E402
+# 本体が作る合言葉（同じ PC の中だけで使う）。本体と同じく HOKENCHAT_DATA でデータの置き場所を変えられる
+TOKEN_FILE = Path(os.environ.get("HOKENCHAT_DATA") or ROOT / "data") / "keys" / "internal.token"
 MAX_FILE = 10_000_000
 FALLBACK = "お問い合わせありがとうございます。内容を確認し、担当者からご連絡します。お急ぎの場合は0120-000-001（平日9:00〜17:00）へお電話ください。"
 names = {}  # ponytail: 表示名のキャッシュはメモリだけ。再起動したら取り直す
@@ -42,7 +44,7 @@ def verify(secret, body, sig):
 def call(url, data=None, token=None, internal=False):
     h = {"Content-Type": "application/json"} | ({"Authorization": f"Bearer {token}"} if token else {})
     if internal:
-        h["X-Internal-Token"] = TOKEN_FILE.read_text().strip() if TOKEN_FILE.exists() else ""
+        h["X-Internal-Token"] = TOKEN_FILE.read_text(encoding="utf-8").strip() if TOKEN_FILE.exists() else ""
     req = urllib.request.Request(url, json.dumps(data).encode() if data is not None else None, h)
     with urllib.request.urlopen(req, timeout=60) as r:
         body = r.read()
@@ -119,8 +121,14 @@ class Webhook(BaseHTTPRequestHandler):
 
 
 class Push(BaseHTTPRequestHandler):
-    """社内（hokenchat 本体）から送る口。トンネルには載せない"""
+    """社内（hokenchat 本体）から送る口。トンネルには載せない
+    同じ PC の他のプログラムやブラウザのページから勝手に送られないよう、本体との合言葉と JSON を必須にする"""
     def do_POST(self):
+        want = TOKEN_FILE.read_text(encoding="utf-8").strip() if TOKEN_FILE.exists() else ""
+        if (not want or not hmac.compare_digest(self.headers.get("X-Internal-Token", ""), want)
+                or not self.headers.get("Content-Type", "").startswith("application/json")):
+            print("合言葉のない送信の依頼を拒否")
+            self.send_response(403); self.end_headers(); return
         try:
             b = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
             call(f"{LINE_API}/message/push", {"to": b["to"], "messages": [{"type": "text", "text": b["text"][:2000]}]},

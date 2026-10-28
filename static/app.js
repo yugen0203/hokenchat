@@ -447,6 +447,7 @@ LOAD.mailing = async () => {
 let QSEL = null;
 LOAD.quotes = async () => {
   const el = $("#p-quotes");
+  if (!purposeGate(el, ["name"], "見積依頼書")) return;  // 契約者名などの顧客情報を使う（F-02）
   el.innerHTML = `<div class="cols"><div><div class="card"><h2><i class="fa-solid fa-wand-magic-sparkles"></i>依頼文から下書き</h2>
       <p class="hint">営業からの依頼文を貼ると、AIが見積依頼書の項目に分けます（推測で補いません）。足りない項目は「確認の質問」にまとめます。</p>
       <div class="row"><select class="i" id="qkind" style="width:auto"><option value="">種目は自動で判定</option>${META.quote_kinds.map(k => `<option>${esc(k)}</option>`).join("")}</select></div>
