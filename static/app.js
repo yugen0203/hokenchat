@@ -346,7 +346,13 @@ LOAD.customers = () => {
       ${edit ? `<div class="card"><h2><i class="fa-solid fa-wand-magic-sparkles"></i>入力支援 <small>メモ・名刺の文字から項目を下書き</small></h2>
         <p class="hint">メモをAIが項目に分けて右の入力欄に入れます（下書き）。<b>登録はしません</b>。原本と照らして確認してから登録してください。<br>病歴・けがの内容・マイナンバー・カード番号を含むメモはAIに送らずに止めます。</p>
         <textarea class="i" id="cmemo" placeholder="例：新規のお客さま 架空花子（カクウハナコ）様 〒530-0001 大阪市北区梅田1-2-3 サンプルビル5階 電話06-0000-0000 自動車保険 満期2027年4月1日"></textarea>
-        <div class="row" style="margin-top:8px"><button class="btn" id="cext">項目に分ける</button></div><div class="msgline" id="cextm"></div></div>` : ""}
+        <div class="row" style="margin-top:8px"><button class="btn" id="cext">項目に分ける</button></div><div class="msgline" id="cextm"></div></div>
+      <div class="card"><h2><i class="fa-solid fa-file-csv"></i>CSVで一括登録・更新</h2>
+        <p class="hint">テンプレートに書いて取り込みます。顧客IDが空の行は新規、顧客IDがある行はその顧客を更新します（空欄の項目は今の値のまま）。
+          氏名と顧客IDが空で契約だけ書いた行は、上の顧客の2件目以降の契約になります。<b>エラーが1件でもあると、何も取り込みません。</b></p>
+        <div class="row"><a class="btn s" href="/api/customers/csv-template"><i class="fa-solid fa-download"></i>テンプレートをダウンロード</a></div>
+        <div class="row" style="margin-top:8px"><input class="i" type="file" id="ccsv" accept=".csv,text/csv" style="flex:1"><button class="btn" id="ccsvchk">内容を確認</button></div>
+        <div id="ccsvres" style="margin-top:8px"></div></div>` : ""}
     </div><div><div class="card" id="cform"><div class="empty">左の一覧から顧客を選ぶ${edit ? "か、［新規］を押してください" : "と、利用目的「" + esc(ME.purpose) + "」で見られる項目だけを表示します"}</div></div></div></div>`;
   const find = async () => {
     const rs = await api("/api/customers?q=" + encodeURIComponent($("#cq").value));
@@ -365,6 +371,21 @@ LOAD.customers = () => {
     custForm({...cur, ...r.customer, id: CSEL || undefined, policies: r.policies}, a, edit, true);
     say($("#cextm"), {}, r.note);
   });
+  const csvRun = async commit => {
+    const f = $("#ccsv").files[0], out = $("#ccsvres");
+    if (!f) return out.innerHTML = `<div class="msgline ng">CSVファイルを選んでください</div>`;
+    out.innerHTML = `<div class="msgline">${commit ? "取り込んでいます…" : "確認しています…"}</div>`;
+    const r = await upload("/api/customers/import", f, {"X-Commit": commit ? "1" : "0"});
+    if (r.error) return out.innerHTML = `<div class="msgline ng">${esc(r.error)}</div>`;
+    const cnt = `新規 <b>${r.new}</b> 件・更新 <b>${r.update}</b> 件・契約 <b>${r.policies}</b> 件`;
+    if (r.errors.length) return out.innerHTML = `<div class="msgline ng">エラーがあるため取り込めません（${r.errors.length >= 50 ? "50件以上" : r.errors.length + "件"}）。CSVを直して、もう一度確認してください。</div>
+      <div class="pre" style="max-height:200px;overflow:auto;font-size:12px">${r.errors.map(esc).join("\n")}</div>`;
+    if (r.committed) { out.innerHTML = `<div class="msgline ok">取り込みました：${cnt}</div>`; $("#ccsv").value = ""; return find(); }
+    out.innerHTML = `<div class="msgline ok">エラーはありません：${cnt}</div><div class="row" style="margin-top:6px"><button class="btn p" id="ccsvgo">この内容で取り込む</button></div>`;
+    $("#ccsvgo").onclick = () => csvRun(true);
+  };
+  $("#ccsvchk")?.addEventListener("click", () => csvRun(false));
+  $("#ccsv")?.addEventListener("change", () => $("#ccsvres").innerHTML = "");
   find();
 };
 function custForm(c, a, edit, drafted) {

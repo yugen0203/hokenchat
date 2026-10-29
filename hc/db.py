@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS line_attach(id INTEGER PRIMARY KEY, msg_id INTEGER, u
 CREATE TABLE IF NOT EXISTS customer(id INTEGER PRIMARY KEY, name TEXT, kana TEXT, postal TEXT, address TEXT, phone TEXT, email TEXT,
   note TEXT, created_by INTEGER, created_at TEXT DEFAULT (datetime('now','localtime')), updated_at TEXT);
 CREATE TABLE IF NOT EXISTS policy(id INTEGER PRIMARY KEY, customer_id INTEGER, insurer TEXT, kind TEXT, policy_no TEXT, start TEXT, expiry TEXT);
+CREATE INDEX IF NOT EXISTS policy_customer ON policy(customer_id, policy_no);
 
 -- 文書保管庫：申込書控え（F-08／F-14〜F-18）
 CREATE TABLE IF NOT EXISTS application_copy(id INTEGER PRIMARY KEY, customer_id INTEGER, title TEXT, kinds TEXT, registered TEXT,

@@ -250,6 +250,18 @@ def _customer_save(r):
     return customers.save(r.body, r.staff)
 
 
+@route("GET", "/api/customers/csv-template", "customer")
+def _customer_csv_template(r):
+    return File(customers.csv_template(), "text/csv; charset=utf-8", "hokenchat_customers_template.csv", inline=False)
+
+
+@route("POST", "/api/customers/import", "customer", purpose=True, raw=True)
+def _customer_import(r):
+    if r.staff["purpose"] != "契約管理":
+        raise AuthError("顧客情報の一括登録・更新は、利用目的「契約管理」で行ってください", 428)
+    return customers.import_csv(r.raw, r.staff, commit=r.h("X-Commit") == "1")
+
+
 @route("POST", "/api/customers/delete", "staff.manage", purpose=True)
 def _customer_delete(r):
     return customers.delete(int(r.body["id"]), r.staff)

@@ -138,6 +138,36 @@ class T(unittest.TestCase):
         d = c.req("/api/customers/extract", {"text": "架空 花子 〒530-0001 大阪府大阪市北区梅田1-2-3"})[1]
         self.assertEqual(d["customer"]["phone"], "")                            # 原文にない電話番号は捨てる
 
+    def test_customer_csv(self):
+        c = Client().login("admin", "Admin12345")
+        s, tpl = c.req("/api/customers/csv-template")
+        self.assertTrue(tpl.startswith("﻿顧客ID,氏名".encode()), tpl[:30])     # Excel で開ける BOM 付き
+        imp = lambda data, commit=False: c.req("/api/customers/import", raw=data, headers={"X-Commit": "1" if commit else "0"})
+        c.req("/api/purpose", {"purpose": "送付状作成"})
+        self.assertEqual(imp(tpl)[0], 428)                                          # 取り込みは「契約管理」だけ
+        c.req("/api/purpose", {"purpose": "契約管理"})
+        r = imp(tpl)[1]                                                             # テンプレートの例：新規1人・契約2件
+        self.assertEqual((r["new"], r["policies"], r["errors"], r["committed"]), (1, 2, [], False))
+        before = db.one("SELECT count(*) AS n FROM customer")["n"]
+        self.assertTrue(imp(tpl, True)[1]["committed"])
+        cid = db.one("SELECT max(id) AS id FROM customer")["id"]
+        self.assertEqual(db.one("SELECT count(*) AS n FROM customer")["n"], before + 1)
+        self.assertEqual(db.one("SELECT count(*) AS n FROM policy WHERE customer_id=?", cid)["n"], 2)
+        # 更新：空欄は今の値のまま、同じ証券番号の契約は上書き、日付は 2027/5/1 も読む（Shift_JIS でも読める）
+        upd = f"顧客ID,氏名,電話,証券番号,満期日\r\n{cid},,06-9999-0000,AB-0000001,2027/5/1\r\n".encode("cp932")
+        self.assertTrue(imp(upd, True)[1]["committed"])
+        row = db.one("SELECT * FROM customer WHERE id=?", cid)
+        self.assertEqual((row["name"], row["phone"]), ("架空 花子", "06-9999-0000"))
+        self.assertEqual(db.one("SELECT expiry FROM policy WHERE customer_id=? AND policy_no='AB-0000001'", cid)["expiry"], "2027-05-01")
+        self.assertEqual(db.one("SELECT count(*) AS n FROM policy WHERE customer_id=?", cid)["n"], 2)
+        # エラーが1件でもあれば何も取り込まない
+        bad = "氏名,メモ,満期日\r\n架空 一郎,,\r\n架空 二郎,持病あり,\r\n架空 三郎,,来年\r\n,06-0000-1111,\r\n".encode()
+        r = imp(bad, True)[1]
+        self.assertFalse(r["committed"])
+        self.assertEqual([e.split("：")[0] for e in r["errors"]], ["3行目", "4行目", "5行目"], r["errors"])
+        self.assertEqual(db.one("SELECT count(*) AS n FROM customer")["n"], before + 1)
+        self.assertIn("顧客ID 999999", imp("顧客ID,氏名\r\n999999,x\r\n".encode())[1]["errors"][0])
+
     # ---- 文書の版管理 ----
     def test_docs_versions(self):
         txt = "第1条（目的）\n傷害保険の目的。\n第2条（入院保険金）\n入院保険金は180日以内の入院に支払う。".encode()

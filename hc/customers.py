@@ -5,7 +5,7 @@
   利用目的タグ（F-02）：選んだ目的で必要な項目だけを返す（例：送付状作成なら氏名・住所だけ）
   入力支援：メモ・名刺の文字を LLM が項目に分けて「下書き」を返す。登録は人が確認してから
 """
-import re
+import csv, io, re
 from . import db, audit, llm
 from .guard import guard
 from .config import CUSTOMER_FIELDS
@@ -95,6 +95,118 @@ def delete(cid, staff):
     db.run("DELETE FROM customer WHERE id=?", cid)
     audit.log("customer_delete", staff=staff, channel="customer", refs=f"c{cid}")
     return {"ok": True}
+
+
+# ---------- CSV の一括登録・更新 ----------
+CSV_KEYS = ["id"] + CUSTOMER_FIELDS + POLICY_FIELDS
+CSV_HEAD = {"id": "顧客ID"} | LABELS
+CSV_MAX_ERRORS = 50
+
+
+def csv_template():
+    """このシステムの項目に合わせたテンプレート。Excel で開けるよう UTF-8（BOM 付き）・CRLF"""
+    rows = [[CSV_HEAD[k] for k in CSV_KEYS],
+            ["", "架空 花子", "カクウ ハナコ", "530-0001", "大阪府大阪市北区梅田1-2-3 サンプルビル5階", "06-0000-0000",
+             "hanako@example.com", "", "損保ジャパン（架空）", "自動車", "AB-0000001", "2026-04-01", "2027-04-01"],
+            ["", "", "", "", "", "", "", "", "損保ジャパン（架空）", "火災", "CD-0000002", "2025-10-01", "2030-10-01"]]
+    out = io.StringIO()
+    csv.writer(out, lineterminator="\r\n").writerows(rows)
+    return out.getvalue().encode("utf-8-sig")
+
+
+def _date(v):
+    """2026/4/1・2026年4月1日・2026-4-1 を 2026-04-01 にそろえる。読めなければ None"""
+    m = re.fullmatch(r"(\d{4})[-/年.](\d{1,2})[-/月.](\d{1,2})日?", v)
+    return f"{int(m[1]):04d}-{int(m[2]):02d}-{int(m[3]):02d}" if m and 1 <= int(m[2]) <= 12 and 1 <= int(m[3]) <= 31 else None
+
+
+def _decode(raw):
+    for enc in ("utf-8-sig", "cp932"):  # Excel の「CSV UTF-8」と、従来の「CSV（Shift_JIS）」の両方を読む
+        try:
+            return raw.decode(enc)
+        except UnicodeDecodeError:
+            pass
+    return None
+
+
+def import_csv(raw, staff, commit=False):
+    """1行＝顧客1人（＋契約1件）。顧客IDが空なら新規、あれば更新。氏名と顧客IDが空の行は、直前の顧客の契約の続き。
+    更新では空欄の項目は今の値のまま。契約は同じ証券番号があれば更新、なければ追加する（削除はしない）。
+    エラーが1件でもあれば何も取り込まない。commit=False は確認だけ（件数とエラーを返す）"""
+    text = _decode(raw or b"")
+    if text is None:
+        return {"error": "文字コードを読めません。Excel で「CSV UTF-8」または「CSV」形式で保存してください"}
+    rows = list(csv.reader(io.StringIO(text)))
+    if not rows:
+        return {"error": "CSV が空です"}
+    names = {v: k for k, v in CSV_HEAD.items()} | {k: k for k in CSV_KEYS}
+    head = [names.get(h.strip()) for h in rows[0]]
+    if "name" not in head and "id" not in head:
+        return {"error": "1行目に「氏名」か「顧客ID」の列がありません。テンプレートの見出しをそのまま使ってください"}
+    known = {r["id"] for r in db.rows("SELECT id FROM customer")}
+    entries, errors = [], []
+    for n, cells in enumerate(rows[1:], start=2):
+        if not any(c.strip() for c in cells):
+            continue
+        rec = {k: (cells[i] if i < len(cells) else "") for i, k in enumerate(head) if k}
+        vals, pol = _clean(rec, CUSTOMER_FIELDS), _clean(rec, POLICY_FIELDS)
+        cid = str(rec.get("id") or "").strip()
+        err = None
+        for k in ("start", "expiry"):
+            if pol[k] and not (d := _date(pol[k])):
+                err = f"{LABELS[k]}「{pol[k]}」を日付として読めません（例：2026-04-01）"
+            elif pol[k]:
+                pol[k] = d
+        if not err and cid and (not cid.isdigit() or int(cid) not in known):
+            err = f"顧客ID {cid} は登録されていません（新規の場合は顧客IDを空にしてください）"
+        if not err and not cid and not vals["name"]:
+            if not any(pol.values()) and not any(vals.values()):
+                continue  # 見出しにない列だけに書かれた行
+            if any(vals.values()):
+                err = "氏名を入れてください"
+            elif not entries:
+                err = "契約だけの行の前に、顧客の行がありません"
+            else:  # 契約の続き行
+                err = _check(pol)
+                if not err:
+                    entries[-1]["pols"].append(pol)
+                    continue
+        err = err or _check(vals) or (_check(pol) if any(pol.values()) else None)
+        if err:
+            errors.append(f"{n}行目：{err}")
+            if len(errors) >= CSV_MAX_ERRORS:
+                break
+            continue
+        entries.append({"id": int(cid) if cid else None, "vals": vals, "pols": [pol] if any(pol.values()) else []})
+    summary = {"new": sum(1 for e in entries if not e["id"]), "update": sum(1 for e in entries if e["id"]),
+               "policies": sum(len(e["pols"]) for e in entries), "errors": errors}
+    if errors or not commit:
+        return summary | {"ok": not errors, "committed": False}
+    con = db.connect()
+    try:
+        for e in entries:
+            if e["id"]:
+                cid = e["id"]
+                if kept := {k: v for k, v in e["vals"].items() if v}:  # 空欄は今の値のまま
+                    con.execute(f"UPDATE customer SET {', '.join(k + '=?' for k in kept)}, updated_at=datetime('now','localtime') WHERE id=?",
+                                (*kept.values(), cid))
+            else:
+                cid = con.execute(f"INSERT INTO customer({', '.join(CUSTOMER_FIELDS)}, created_by) VALUES({', '.join('?' * len(CUSTOMER_FIELDS))}, ?)",
+                                  (*e["vals"].values(), staff["id"])).lastrowid
+            for p in e["pols"]:
+                old = p["policy_no"] and con.execute("SELECT id FROM policy WHERE customer_id=? AND policy_no=?", (cid, p["policy_no"])).fetchone()
+                if old:
+                    if kept := {k: v for k, v in p.items() if v}:
+                        con.execute(f"UPDATE policy SET {', '.join(k + '=?' for k in kept)} WHERE id=?", (*kept.values(), old[0]))
+                else:
+                    con.execute(f"INSERT INTO policy(customer_id, {', '.join(POLICY_FIELDS)}) VALUES(?, {', '.join('?' * len(POLICY_FIELDS))})",
+                                (cid, *p.values()))
+        con.commit()
+    finally:
+        con.close()
+    audit.log("customer_import", staff=staff, channel="customer",
+              result=f"new {summary['new']} / update {summary['update']} / policies {summary['policies']}")
+    return summary | {"ok": True, "committed": True}
 
 
 # ---------- 入力支援（メモ → 項目の下書き） ----------
