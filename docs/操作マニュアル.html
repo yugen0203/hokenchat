@@ -1,0 +1,333 @@
+<title>hokenchat 操作マニュアル</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=M+PLUS+1+Code:wght@400;500&display=swap">
+<style>
+/* レイアウト：左に目次（スマホでは上）、右に章。アプリ本体と同じ紺のサイドバー・青のアクセント */
+:root {
+  --bg: #f5f6f8; --card: #ffffff; --ink: #1d2330; --sub: #5d6676; --rule: #e3e6ec;
+  --accent: #1f4fd1; --accent-bg: #eef2ff; --side: #111827; --side-ink: #cbd5e1;
+  --warn: #b42318; --warn-bg: #fee4e2; --ok: #15803d; --ok-bg: #dcfce7; --amber: #92400e; --amber-bg: #fef3c7;
+  --sans: "Noto Sans JP", "Hiragino Sans", "Yu Gothic UI", "Meiryo", sans-serif;
+  --mono: "M PLUS 1 Code", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f131a; --card: #171c25; --ink: #e5e8ee; --sub: #9aa3b2; --rule: #2a313d;
+  --accent: #7f9cff; --accent-bg: #1c2540; --side: #0a0d13; --side-ink: #aab4c4;
+  --warn: #ff8a80; --warn-bg: #3a1b1a; --ok: #6fd69a; --ok-bg: #14301f; --amber: #f2c46d; --amber-bg: #33280f; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0f131a; --card: #171c25; --ink: #e5e8ee; --sub: #9aa3b2; --rule: #2a313d;
+  --accent: #7f9cff; --accent-bg: #1c2540; --side: #0a0d13; --side-ink: #aab4c4;
+  --warn: #ff8a80; --warn-bg: #3a1b1a; --ok: #6fd69a; --ok-bg: #14301f; --amber: #f2c46d; --amber-bg: #33280f; color-scheme: dark }
+
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--ink); font: 15px/1.85 var(--sans); }
+.wrap { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 0; min-height: 100vh }
+nav.toc { background: var(--side); color: var(--side-ink); padding-block: 28px; padding-inline: 20px; position: sticky; top: 0; height: 100vh; overflow-y: auto }
+nav.toc .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; color: #fff; font-size: 17px }
+nav.toc .brand i { font-style: normal; background: var(--accent); color: #fff; width: 28px; height: 28px; border-radius: 7px; display: grid; place-items: center; font-size: 14px }
+nav.toc .ver { font-size: 12px; margin: 4px 0 18px }
+nav.toc .g { font-size: 11px; letter-spacing: .12em; color: #7c8798; margin: 16px 0 4px }
+nav.toc a { display: block; color: var(--side-ink); text-decoration: none; font-size: 13.5px; padding: 4px 8px; border-radius: 6px }
+nav.toc a:hover, nav.toc a:focus-visible { background: #1f2937; color: #fff; outline: none }
+main { padding-block: 36px 80px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)) }
+.inner { max-width: 760px; margin: 0 auto; display: grid; gap: 22px }
+header.top h1 { font-size: 28px; line-height: 1.4; margin: 0; text-wrap: balance }
+header.top p { color: var(--sub); margin: 6px 0 0 }
+section { background: var(--card); border: 1px solid var(--rule); border-radius: 12px; padding: 22px 24px; scroll-margin-top: 16px; min-width: 0 }
+section h2 { font-size: 20px; margin: 0 0 4px; display: flex; gap: 10px; align-items: baseline; text-wrap: balance }
+section h2 .where { font-size: 12px; font-weight: 500; color: var(--accent); background: var(--accent-bg); padding: 1px 8px; border-radius: 999px; white-space: nowrap }
+section h3 { font-size: 15.5px; margin: 18px 0 4px }
+section > p.lead { color: var(--sub); margin: 0 0 8px }
+ol.steps { counter-reset: s; list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 8px }
+ol.steps > li { counter-increment: s; display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px }
+ol.steps > li::before { content: counter(s); width: 24px; height: 24px; margin-top: 3px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 12.5px; font-weight: 700; display: grid; place-items: center; font-variant-numeric: tabular-nums }
+ul { margin: 6px 0; padding-left: 1.3em }
+b.ui { font-weight: 500; background: var(--bg); border: 1px solid var(--rule); border-radius: 5px; padding: 0 6px; white-space: nowrap }
+.note { border-radius: 8px; padding: 10px 14px; margin: 10px 0; font-size: 14px }
+.note.warn { background: var(--warn-bg); color: var(--ink) } .note.warn b:first-child { color: var(--warn) }
+.note.tip { background: var(--accent-bg) } .note.tip b:first-child { color: var(--accent) }
+.note.amber { background: var(--amber-bg) } .note.amber b:first-child { color: var(--amber) }
+.tbl { overflow-x: auto; margin: 8px 0 }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; line-height: 1.6 }
+th, td { border-bottom: 1px solid var(--rule); padding: 7px 10px; text-align: left; vertical-align: top }
+th { color: var(--sub); font-weight: 500; white-space: nowrap; background: var(--bg) }
+td.y { color: var(--ok); font-weight: 700; text-align: center } td.n { color: var(--sub); text-align: center }
+.flow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 8px 0; font-size: 13.5px }
+.flow span { background: var(--bg); border: 1px solid var(--rule); border-radius: 999px; padding: 2px 12px }
+.flow span.h { background: var(--accent-bg); border-color: transparent; color: var(--accent); font-weight: 500 }
+.flow em { font-style: normal; color: var(--sub) }
+code, .mono { font-family: var(--mono); font-size: .92em }
+footer { color: var(--sub); font-size: 12.5px; text-align: center }
+@media (max-width: 860px) {
+  .wrap { grid-template-columns: minmax(0, 1fr) }
+  nav.toc { position: static; height: auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)) }
+  nav.toc .links { display: flex; flex-wrap: wrap; gap: 2px 4px } nav.toc .g { width: 100% }
+  section { padding: 18px 16px }
+}
+@media print { nav.toc { display: none } .wrap { display: block } section { break-inside: avoid; border: 0 } }
+</style>
+
+<div class="wrap">
+<nav class="toc" aria-label="目次">
+  <div class="brand"><i>保</i>hokenchat</div>
+  <div class="ver">操作マニュアル（試作 第0.2.1版）</div>
+  <div class="links">
+    <div class="g">はじめに</div>
+    <a href="#start">ログインと最初の設定</a>
+    <a href="#purpose">利用目的とは</a>
+    <a href="#roles">ロールとできること</a>
+    <div class="g">業務</div>
+    <a href="#chat">社内チャット</a>
+    <a href="#line">公式LINE</a>
+    <a href="#customers">顧客DB（顧客の登録）</a>
+    <a href="#mailing">郵送（送付状・封筒）</a>
+    <a href="#quotes">見積依頼書</a>
+    <a href="#tasks">タスク</a>
+    <div class="g">文書</div>
+    <a href="#docs">登録文書（約款・規程）</a>
+    <a href="#vault">文書保管庫（申込書控え）</a>
+    <div class="g">管理（管理者のみ）</div>
+    <a href="#audit">監査ログ・月次点検</a>
+    <a href="#admin">社員・設定</a>
+    <div class="g">困ったとき</div>
+    <a href="#faq">よくある質問</a>
+  </div>
+</nav>
+
+<main><div class="inner">
+<header class="top">
+  <h1>hokenchat 操作マニュアル</h1>
+  <p>社内AIアシスタント（試作）の画面ごとの使い方です。AIもデータもこのPCの中だけで動きます。試作のデータはすべて架空で、実在のお客さまの情報は入れないでください。</p>
+</header>
+
+<section id="start">
+  <h2>ログインと最初の設定</h2>
+  <p class="lead">最初の1回だけ、管理者のアカウントを作ります。社員のアカウントは、そのあと管理者が追加します。</p>
+  <h3>管理者を作る（最初の1回）</h3>
+  <ol class="steps">
+    <li>デスクトップの <b class="ui">hokenchat</b> アイコンをダブルクリックします。</li>
+    <li>「初期設定」の画面で、ログインID・氏名・パスワード（10文字以上、英字と数字を両方含む）を入れて <b class="ui">管理者を作成</b> を押します。</li>
+    <li>ログイン画面で、IDとパスワードを入れて <b class="ui">次へ</b> を押します。</li>
+    <li>認証アプリの登録画面が出ます。スマホの認証アプリ（Google Authenticator・Microsoft Authenticator など）で「セットアップキーを入力」を選び、表示されたキーを入れます（種類は「時間ベース」）。</li>
+    <li>アプリに出た6桁の数字を入れて <b class="ui">登録してログイン</b> を押します。</li>
+  </ol>
+  <h3>2回目からのログイン</h3>
+  <p>ID・パスワードを入れたあと、認証アプリに出ている6桁の確認コードを入れます。コードは30秒ごとに変わり、同じコードは2回使えません。5回まちがえると、IDとパスワードの入力からやり直しになります。</p>
+  <h3>社員が初めてログインするとき</h3>
+  <p>管理者から受け取った仮のパスワードでログインすると、自分だけが知るパスワードへの変更を求められます。そのあと認証アプリを登録します。</p>
+  <div class="note tip"><b>右上のボタン</b>　鍵のアイコンでパスワードの変更、ベルのアイコンで通知の確認、右端でログアウトができます。</div>
+</section>
+
+<section id="purpose">
+  <h2>利用目的とは</h2>
+  <p class="lead">顧客情報を使う画面では、最初に画面右上の「利用目的」を選びます。選んだ目的に必要な項目だけが表示されます。必要以上の個人情報を見ないための仕組みです。</p>
+  <p>目的を選ばずに顧客DB・郵送・見積依頼書を開くと、「利用目的を選んでください」と表示されます。目的はログイン中いつでも変えられます。選んだ目的は監査ログに残ります。</p>
+  <div class="tbl"><table>
+    <tr><th>利用目的</th><th>氏名・フリガナ</th><th>郵便番号・住所</th><th>電話</th><th>メール・メモ</th><th>契約概要</th><th>主に使う画面</th></tr>
+    <tr><td><b>契約管理</b></td><td class="y">○</td><td class="y">○</td><td class="y">○</td><td class="y">○</td><td class="y">○</td><td>顧客DBの登録・修正（<b>登録はこの目的だけ</b>）</td></tr>
+    <tr><td>送付状作成</td><td class="y">○</td><td class="y">○</td><td class="n">－</td><td class="n">－</td><td class="n">－</td><td>郵送</td></tr>
+    <tr><td>更改案内</td><td class="y">○</td><td class="y">○</td><td class="y">○</td><td class="n">－</td><td class="y">○</td><td>郵送・顧客DB（閲覧）</td></tr>
+    <tr><td>事故対応</td><td class="y">○</td><td class="n">－</td><td class="y">○</td><td class="n">－</td><td class="y">○</td><td>顧客DB（閲覧）</td></tr>
+    <tr><td>見積依頼</td><td class="y">○</td><td class="n">－</td><td class="n">－</td><td class="n">－</td><td class="y">○</td><td>見積依頼書</td></tr>
+    <tr><td>お客さま対応</td><td class="y">○</td><td class="n">－</td><td class="y">○</td><td>メールのみ</td><td class="y">○</td><td>公式LINEの顧客ひも付け</td></tr>
+  </table></div>
+  <p>顧客情報を使わない作業には、「約款・規程の検索」「文書管理」「社内事務」を選びます。</p>
+</section>
+
+<section id="roles">
+  <h2>ロールとできること</h2>
+  <div class="tbl"><table>
+    <tr><th>できること</th><th>管理者</th><th>募集人</th><th>事務員</th></tr>
+    <tr><td>社内チャット・公式LINE・顧客DB・郵送・見積依頼書・タスク</td><td class="y">○</td><td class="y">○</td><td class="y">○</td></tr>
+    <tr><td>文書の登録（承認待ちにする）</td><td class="y">○</td><td class="y">○</td><td class="y">○</td></tr>
+    <tr><td>文書の承認・差し戻し・外す</td><td class="y">○</td><td class="n">－</td><td class="n">－</td></tr>
+    <tr><td>申込書控えの登録・一覧・種目変更などの申請</td><td class="y">○</td><td class="y">○</td><td class="y">○</td></tr>
+    <tr><td>申込書控えの原本を開く</td><td class="y">○</td><td class="n">－</td><td class="y">○</td></tr>
+    <tr><td>申請の承認・日次ジョブの手動実行</td><td class="y">○</td><td class="n">－</td><td class="n">－</td></tr>
+    <tr><td>顧客の削除</td><td class="y">○</td><td class="n">－</td><td class="n">－</td></tr>
+    <tr><td>監査ログ・月次点検・社員と設定・AI停止スイッチ</td><td class="y">○</td><td class="n">－</td><td class="n">－</td></tr>
+  </table></div>
+  <p>管理者は「生成AI責任者」を兼ねます。左のメニューには、そのロールで使える画面だけが出ます。</p>
+</section>
+
+<section id="chat">
+  <h2>社内チャット <span class="where">業務</span></h2>
+  <p class="lead">約款・規程を検索して、根拠になる条文の原文を出典つきで表示します。AIは支払いの可否などの判断はしません。</p>
+  <ol class="steps">
+    <li>下の入力欄に質問を書いて <b class="ui">送信</b> を押します。例の質問ボタンを押しても試せます。</li>
+    <li>先に「検索した候補の条文」が出て、続いてAIが選んだ行が出ます。</li>
+    <li><b>黄色</b>がAIの選んだ行、<b>灰色</b>は前後の行です。AIが隣の行を選ぶことがあるので、前後もあわせて読んで判断してください。</li>
+  </ol>
+  <div class="note warn"><b>入れてはいけないもの</b>　病歴・けがの内容などのお客さま個人の状態、マイナンバー、カード番号は送信前に止まり、AIには送られません。「入院」「手術」などの商品の用語だけなら質問できます。</div>
+  <p>登録文書にないことを聞くと「該当なし」と答えます。</p>
+</section>
+
+<section id="line">
+  <h2>公式LINE <span class="where">業務</span></h2>
+  <p class="lead">お客さまとの1:1トークです。公式LINEのキーを設定したときだけ使えます（セットアップは SETUP.md の6章）。</p>
+  <ol class="steps">
+    <li>左の一覧からトークを選びます。</li>
+    <li>右上で <b class="ui">AIモード</b> か <b class="ui">手動モード</b> を選びます。
+      <ul><li><b>AIモード</b>：お客さまのメッセージをAIが分類し、承認済みの定型文で自動で返信します。担当者が割り込んで送ることもできます。</li>
+      <li><b>手動モード</b>：AIは返信しません。担当者が返信します。</li></ul></li>
+    <li>返信は下の欄に書いて <b class="ui">送信</b> を押すと、お客さまのLINEに届きます。<b class="ui">AIの下書き</b> を押すと定型文の候補が入るので、直してから送ります。</li>
+  </ol>
+  <h3>顧客DBとひも付ける</h3>
+  <p>利用目的を「お客さま対応」にしてから <b class="ui">顧客とひも付け</b> を押し、顧客を検索して選びます。<b>電話などで本人確認が済んだときだけ</b>ひも付けてください。LINEの表示名だけで判断しないでください。</p>
+  <p>お客さまから届いた画像・PDFは暗号化して保管され、AIには読ませません。<b class="ui">担当者が開く</b> で中身を見られます。トークと添付は90日で自動削除されます。</p>
+</section>
+
+<section id="customers">
+  <h2>顧客DB（顧客の登録） <span class="where">業務</span></h2>
+  <p class="lead">顧客の登録・修正は、利用目的を<b>「契約管理」</b>にしたときだけできます。ほかの目的では閲覧だけで、その目的に必要な項目しか表示されません。</p>
+  <h3>新しい顧客を登録する</h3>
+  <ol class="steps">
+    <li>画面右上の利用目的で <b class="ui">契約管理</b> を選びます。</li>
+    <li>左のメニューで <b class="ui">顧客DB</b> を開き、検索欄の横の <b class="ui">＋ 新規</b> を押します。</li>
+    <li>右の入力欄に、氏名（必須）・フリガナ・郵便番号・電話・住所・メール・メモを入れます。</li>
+    <li>契約がある場合は <b class="ui">＋ 契約を追加</b> を押し、保険会社・種目・証券番号・始期・満期（YYYY-MM-DD）を入れます。行の × で消せます。</li>
+    <li><b class="ui">登録</b> を押します。左の一覧に出れば完了です。</li>
+  </ol>
+  <h3>メモや名刺から下書きする（入力支援）</h3>
+  <ol class="steps">
+    <li>左下の「入力支援」の欄に、メモや名刺の文字を貼って <b class="ui">項目に分ける</b> を押します。</li>
+    <li>AIが項目に分けて右の入力欄に入れます。「AIの下書き・未登録」と表示され、この時点ではまだ登録されていません。</li>
+    <li>原本と見比べて直してから <b class="ui">登録</b> を押します。</li>
+  </ol>
+  <div class="note warn"><b>登録できない情報</b>　病歴・けがの内容（要配慮個人情報）、マイナンバー、カード番号の項目はありません。これらを含むメモは、AIに送る前に止まります。</div>
+  <h3>探す・直す・消す</h3>
+  <p>検索欄に氏名・フリガナ・電話・顧客IDを入れて <b class="ui">検索</b> を押し、一覧の行を押すと右に内容が出ます。直したら <b class="ui">更新</b> を押します。削除は管理者だけができます。</p>
+</section>
+
+<section id="mailing">
+  <h2>郵送（送付状・封筒） <span class="where">業務</span></h2>
+  <p class="lead">顧客DBの宛先から、送付状・封筒・宛名ラベルのPDFを作ります。宛先は手で書き写さず、必ず顧客DBから選びます。作った人とは別の担当者が照合してから発送します。</p>
+  <div class="flow"><span class="h">作成</span><em>→</em><span>印刷</span><em>→</em><span class="h">別の担当者が照合</span><em>→</em><span>発送済にする</span></div>
+  <h3>送付物を作る</h3>
+  <ol class="steps">
+    <li>利用目的で <b class="ui">送付状作成</b> か <b class="ui">更改案内</b> を選び、左のメニューで <b class="ui">郵送（送付状・封筒）</b> を開きます。</li>
+    <li>「宛先」の欄で氏名・フリガナを検索し、送る顧客にチェックを入れます。複数選べます。郵便番号か住所が未登録の顧客は作れないので、先に顧客DBで登録してください。</li>
+    <li>「送付の種類」を選びます。種類に合わせて、同封物のチェックリストが自動で入ります。
+      <ul><li>更改のご案内／保険証券の送付／申込書控えの送付／保険金請求書類の送付／各種手続き書類の送付</li></ul></li>
+    <li>「封筒」で <b class="ui">長3</b> か <b class="ui">角2</b> を選びます。</li>
+    <li>同封物のチェックを外したり、<b class="ui">追加</b> で足したりします。必要なら「送付状に添える一言」を入れます。</li>
+    <li><b class="ui">作成（照合待ちにする）</b> を押します。右の一覧に「確認待ち」で出ます。</li>
+  </ol>
+  <h3>印刷する</h3>
+  <ol class="steps">
+    <li>右の一覧で、印刷するものにチェックを入れます（作成した直後は自動で選ばれています）。</li>
+    <li><b class="ui">送付状</b>・<b class="ui">封筒</b>・<b class="ui">宛名ラベル（A4 12面）</b> のどれかを押すと、PDFが別の窓で開きます。そこから印刷します。</li>
+    <li>AIが作った文面を含む場合は、<b class="ui">AI表記を付ける</b> にチェックを入れてから押します。</li>
+  </ol>
+  <h3>照合して発送する</h3>
+  <ol class="steps">
+    <li><b>作った人とは別の担当者</b>が、印刷物で宛名・同封物・送付状の中身を確かめ、<b class="ui">照合した</b> を押します。作った本人のボタンは押せないようになっています。</li>
+    <li>発送したら <b class="ui">発送済にする</b> を押します。</li>
+  </ol>
+  <div class="note tip"><b>差出人</b>　送付状・封筒に印字する代理店名・住所・電話は、管理者が「社員・設定」の「差出人」で設定します。</div>
+</section>
+
+<section id="quotes">
+  <h2>見積依頼書 <span class="where">業務</span></h2>
+  <p class="lead">営業からの依頼文をAIが見積依頼書の項目に分けます。人が確認・承認してJ-NET入力票を作り、J-NETへは人が手で入力します。</p>
+  <div class="flow"><span>依頼文を貼る</span><em>→</em><span class="h">下書き</span><em>→</em><span class="h">確認して承認</span><em>→</em><span>J-NET入力票</span><em>→</em><span>J-NETへ手入力</span><em>→</em><span class="h">突合</span><em>→</em><span>成約／不成約</span></div>
+  <ol class="steps">
+    <li>利用目的で <b class="ui">見積依頼</b> を選び、<b class="ui">見積依頼書</b> を開きます。</li>
+    <li>「依頼文から下書き」に営業からの依頼文を貼り、必要なら種目（自動車・火災・その他）を選んで <b class="ui">下書きを作る</b> を押します。</li>
+    <li>右に項目が入ります。AIは推測では埋めません。足りない項目があると「確認の質問」が出るので、<b class="ui">コピー</b> して営業に確認します。</li>
+    <li>聞いた内容を入れて <b class="ui">保存</b> します。必須項目（* 印）が全部埋まると <b class="ui">確認して承認</b> が押せます。</li>
+    <li><b class="ui">J-NET入力票</b> でPDFを開きます。これを見ながらJ-NETに手で入力し、入れた項目に印を付けます。</li>
+    <li>J-NETの見積結果（見積書の文字）を「J-NETの結果と突合」の欄に貼り、<b class="ui">突合する</b> を押します。項目ごとに一致・不一致が出ます。</li>
+    <li>結果が出たら <b class="ui">成約</b> か <b class="ui">不成約</b> を押します。成約のときは、文書保管庫に登録した申込書控えの<b>文書ID</b>を先に入れます。</li>
+  </ol>
+  <div class="note amber"><b>今の様式は仮のもの</b>　項目は損保ジャパンの正式な見積依頼書の様式が届いたら差し替えます。成約しなかった見積依頼書は、作成から1年で自動削除されます。</div>
+</section>
+
+<section id="tasks">
+  <h2>タスク <span class="where">業務</span></h2>
+  <p class="lead">依頼を「誰が・何を・いつまでに」に整理します。上に、未完了・期限超過・今日まで・担当未定の件数が出ます。</p>
+  <ol class="steps">
+    <li>「タスクを登録」に依頼文を貼って <b class="ui">案を作る</b> を押すと、AIが件名・担当・期限の案を入れます。</li>
+    <li>中身を確かめて直し、<b class="ui">登録（人が確定）</b> を押します。依頼文を使わず、直接入れて登録してもかまいません。</li>
+    <li>状態（未着手・対応中・完了）を進めます。期限を過ぎたものには「期限超過」が付きます。</li>
+  </ol>
+  <p>毎朝8:30に、その日のタスクのまとめが通知に届きます。完了したタスクは1年後に自動削除されます。</p>
+</section>
+
+<section id="docs">
+  <h2>登録文書（約款・規程） <span class="where">文書</span></h2>
+  <p class="lead">社内チャットで検索する約款・規程を登録します。登録した版は「承認待ち」になり、管理者が承認すると検索の対象になります。新しい版を承認すると、古い版は自動で外れます。</p>
+  <ol class="steps">
+    <li>「文書を登録」で、ファイル（PDF・テキスト・写真）を選ぶか、ドラッグします。文書名・版・保険会社（発行元）を入れます。同じ文書名で登録すると、その文書の新しい版になります。</li>
+    <li><b class="ui">登録（承認待ちにする）</b> を押します。写真やスキャンしたPDFは、PCの文字認識で文字にしてから取り込みます。</li>
+    <li>管理者が「文書と版」の一覧で <b class="ui">中身</b> を確かめ、<b class="ui">承認</b> か <b class="ui">差し戻し</b> を押します。</li>
+    <li>使わなくなった文書は、管理者が <b class="ui">外す</b> で検索の対象から外します。</li>
+  </ol>
+  <h3>フォルダに置いて取り込む</h3>
+  <p><span class="mono">data/inbox</span> フォルダにファイルを置くと、1分ごとに確認して承認待ちで取り込みます。ファイル名を「文書名__版.pdf」にすると版も読み取ります。すぐ取り込みたいときは <b class="ui">今すぐ確認</b> を押します。</p>
+</section>
+
+<section id="vault">
+  <h2>文書保管庫（申込書控え） <span class="where">文書</span></h2>
+  <p class="lead">申込書控えを暗号化して保管し、保存期間が過ぎたら自動で消去します。保存期間は種目で決まります。</p>
+  <div class="tbl"><table><tr><th>種目</th><th>保存期間</th></tr><tr><td>自動車</td><td>3年</td></tr><tr><td>火災</td><td>5年</td></tr><tr><td>その他</td><td>3年</td></tr></table></div>
+  <ol class="steps">
+    <li>「申込書控えを登録」で、書類名・顧客ID（任意。顧客DBの番号）・種目（必須）を入れ、PDFか画像（PNG・JPEG・TIFF・HEIC）を選んで <b class="ui">登録</b> を押します。</li>
+    <li>種目を選ばずに登録すると「要判断（未設定）」になり、種目を決めるまで消去されません。</li>
+    <li>一覧で <b class="ui">表示</b> を押すと原本が開きます（管理者・事務員だけ）。</li>
+  </ol>
+  <h3>種目を変える・消去を止める（申請）</h3>
+  <ul>
+    <li><b class="ui">種目変更</b>：申請して管理者が承認すると、満了日を<b>元の登録日から</b>計算し直します。</li>
+    <li><b>リーガルホールド</b>：紛争中・事故対応中などで満了後も残したいときに申請します。管理者が承認すると消去を保留し、6か月ごとに見直します。承認待ちのあいだに満了した場合も、判断が出るまで消去しません。</li>
+  </ul>
+  <h3>自動消去のしくみ</h3>
+  <p>毎日午前2:00に、満了の14日前と前日に社内通知を出し、満了したものを消去して削除ログに残します。PCが止まっていた日の分は、次に起動したときに処理します。</p>
+</section>
+
+<section id="audit">
+  <h2>監査ログ・月次点検 <span class="where">管理者のみ</span></h2>
+  <p class="lead">誰が・いつ・何の目的で・何をしたかを記録します。質問や文書の本文は保存しません。</p>
+  <ul>
+    <li><b>監査ログ</b>：操作の一覧です。ログが書き換えられていないかを自動で確かめ、「改ざんは見つかりません」と表示されます。</li>
+    <li><b>月次点検</b>：月を選んで <b class="ui">表示</b> を押すと、ガードで止まった入力、ログの改ざん、削除件数の照合、権限の一覧が出ます。確かめたら <b class="ui">印刷して記録に残す</b> を押して保管します。</li>
+  </ul>
+</section>
+
+<section id="admin">
+  <h2>社員・設定 <span class="where">管理者のみ</span></h2>
+  <h3>社員を追加する</h3>
+  <ol class="steps">
+    <li>「社員アカウント」の下の「社員を追加」で、ログインID・氏名・ロール（管理者・募集人・事務員）・仮パスワード（10文字以上、英字と数字）を入れて <b class="ui">追加</b> を押します。</li>
+    <li>仮のパスワードを本人に伝えます。本人が初めてログインすると、パスワードの変更と認証アプリの登録に進みます。</li>
+  </ol>
+  <ul>
+    <li><b class="ui">仮パスワード</b>：パスワードを忘れた社員に、新しい仮のパスワードを発行します。</li>
+    <li><b class="ui">多要素を再登録</b>：スマホを替えた・なくした社員の認証アプリを登録し直してもらいます。</li>
+    <li><b class="ui">無効にする</b>：退職した社員などのアカウントを使えなくします。<b class="ui">有効にする</b> で戻せます。</li>
+  </ul>
+  <h3>AI停止スイッチ</h3>
+  <p><b class="ui">AIを停止する</b> を押すと、検索・分類・下書きなどAIを使う処理がすべて止まります。公式LINEのAIモードは一律の定型文に切り替わるので、お客さまへの返信が途切れることはありません。一覧・登録・印刷などはそのまま使えます。戻すときは <b class="ui">AIを再開する</b> を押します。</p>
+  <h3>差出人</h3>
+  <p>送付状・封筒に印字する代理店名・郵便番号・住所・電話を設定します。</p>
+</section>
+
+<section id="faq">
+  <h2>よくある質問</h2>
+  <div class="tbl"><table>
+    <tr><th>こんなとき</th><th>こうしてください</th></tr>
+    <tr><td>顧客DBに［新規］ボタンがない</td><td>利用目的を「契約管理」にしてください。ほかの目的では閲覧だけになります。</td></tr>
+    <tr><td>「利用目的を選んでください」と出る</td><td>画面右上の「利用目的」で、その画面で使える目的を選びます。使える目的は画面に表示されます。</td></tr>
+    <tr><td>郵送で「郵便番号または住所が未登録」と出る</td><td>顧客DBで、その顧客の郵便番号と住所を登録してから作り直します。</td></tr>
+    <tr><td>郵送の［照合した］が押せない</td><td>作った本人は照合できません。別の担当者のアカウントで照合してください。</td></tr>
+    <tr><td>見積依頼書の［確認して承認］が押せない</td><td>必須項目（* 印）が空いています。「確認の質問」を営業に確認して埋めてください。</td></tr>
+    <tr><td>左下が「ローカルLLM 停止中」（赤）</td><td>AIが止まっています。アプリを終了して、デスクトップのアイコンから起動し直してください。</td></tr>
+    <tr><td>確認コードが通らない</td><td>スマホとPCの時刻がずれています。両方を時刻の自動設定にしてください。</td></tr>
+    <tr><td>認証アプリのスマホをなくした</td><td>別の管理者に「社員・設定」で［多要素を再登録］を押してもらいます。</td></tr>
+    <tr><td>「送信を止めました」と出た</td><td>病歴・マイナンバー・カード番号などが含まれています。その部分を消して送り直してください。</td></tr>
+  </table></div>
+</section>
+
+<footer>hokenchat 試作 第0.2.1版　操作マニュアル　作成：小林</footer>
+</div></main>
+</div>
