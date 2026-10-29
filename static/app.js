@@ -30,6 +30,8 @@ const openFile = url => window.open(url, "_blank", "width=900,height=900");
 function modal(html) { $("#mbox").innerHTML = html; $("#modal").classList.add("on"); return $("#mbox"); }
 function closeModal() { $("#modal").classList.remove("on"); }
 $("#modal").addEventListener("mousedown", e => { if (e.target.id === "modal" && !$("#modal").dataset.lock) closeModal(); });
+// CSP でインラインの onclick は動かないので、閉じる・印刷のボタンはここでまとめて受ける
+document.addEventListener("click", e => { if (e.target.closest("[data-close]")) closeModal(); else if (e.target.closest("[data-print]")) window.print(); });
 
 // =================== ログイン・初期設定 ===================
 async function boot() {
@@ -95,7 +97,7 @@ function pwForm(forced) {
     <form id="pwf"><label class="f"><span>今のパスワード</span><input class="i" type="password" name="old" autocomplete="current-password"></label>
     <label class="f"><span>新しいパスワード（10文字以上・英字と数字）</span><input class="i" type="password" name="new" autocomplete="new-password"></label>
     <label class="f"><span>新しいパスワード（確認）</span><input class="i" type="password" name="new2" autocomplete="new-password"></label>
-    <div class="row" style="margin-top:6px"><button class="btn p">変更する</button>${forced ? "" : `<button type="button" class="btn" onclick="closeModal()">閉じる</button>`}</div>
+    <div class="row" style="margin-top:6px"><button class="btn p">変更する</button>${forced ? "" : `<button type="button" class="btn" data-close>閉じる</button>`}</div>
     <div class="msgline" id="pwm"></div></form>`;
 }
 function bindPw(done) {
@@ -304,7 +306,7 @@ async function linkCustomer() {
   if (!ME.purpose || ME.purpose !== "お客さま対応") { alert("顧客とのひも付けは、利用目的「お客さま対応」を選んでから行ってください（本人確認のあとに行います）"); return needPurpose(); }
   const box = modal(`<h2>顧客DBとひも付け</h2><p class="hint">お電話などで<b>本人確認が済んだ場合だけ</b>ひも付けてください。LINEの表示名だけで判断しないでください。</p>
     <div class="row"><input class="i" id="lq" placeholder="氏名・フリガナ・電話で検索" style="flex:1"><button class="btn" id="lqb">検索</button></div>
-    <div id="lqr" style="margin-top:10px"></div><div class="row end" style="margin-top:12px">${LCUR.customer_id ? `<button class="btn d" id="lunlink">ひも付けを外す</button>` : ""}<button class="btn" onclick="closeModal()">閉じる</button></div>`);
+    <div id="lqr" style="margin-top:10px"></div><div class="row end" style="margin-top:12px">${LCUR.customer_id ? `<button class="btn d" id="lunlink">ひも付けを外す</button>` : ""}<button class="btn" data-close>閉じる</button></div>`);
   const find = async () => {
     const rs = await api("/api/customers?q=" + encodeURIComponent($("#lq").value));
     $("#lqr").innerHTML = Array.isArray(rs) && rs.length ? `<div class="tbl"><table>${rs.map(c => `<tr class="click" data-id="${c.id}"><td>${c.id}</td><td>${esc(c.name)}</td><td>${esc(c.kana || "")}</td><td>${esc(c.phone || "")}</td></tr>`).join("")}</table></div>` : `<div class="empty">${esc(rs.error || "見つかりません")}</div>`;
@@ -582,14 +584,14 @@ LOAD.docs = async () => {
         ${adm && v.status === "pending" ? `<button class="btn s" data-ed="${v.id}">修正</button><button class="btn s p" data-ap="${v.id}">承認</button><button class="btn s d" data-rj="${v.id}">差し戻し</button>` : ""}
         ${can("docs.delete") && v.status === "active" ? `<button class="btn s d" data-rm="${v.id}" title="検索の対象から外す">外す</button>` : ""}</td></tr>`).join("")}</table></div>`;
     const on = (sel, fn) => $("#dlist").querySelectorAll(sel).forEach(b => b.onclick = () => fn(+Object.values(b.dataset)[0], rs.find(x => x.id === +Object.values(b.dataset)[0])));
-    on("[data-pv]", async id => { const cs = await api("/api/docs/preview?id=" + id); modal(`<h2>取り込んだ中身（先頭200件）</h2>${cs.map(c => `<div class="src"><b>${esc(c.article)}</b><br>${esc(c.body)}</div>`).join("")}<div class="row end"><button class="btn" onclick="closeModal()">閉じる</button></div>`); });
+    on("[data-pv]", async id => { const cs = await api("/api/docs/preview?id=" + id); modal(`<h2>取り込んだ中身（先頭200件）</h2>${cs.map(c => `<div class="src"><b>${esc(c.article)}</b><br>${esc(c.body)}</div>`).join("")}<div class="row end"><button class="btn" data-close>閉じる</button></div>`); });
     on("[data-ap]", async (id, v) => { if (!confirm(`「${v.title}」${v.version} を承認して検索の対象にしますか？${rs.some(x => x.title === v.title && x.status === "active") ? "\n今の検索対象の版は「旧版」になり、検索から外れます。" : ""}`)) return; const r = await api("/api/docs/approve", {id}); if (r.error) alert(r.error); list(); counts(); });
     on("[data-rj]", async id => { if (!confirm("差し戻しますか？（索引と原本を消します）")) return; await api("/api/docs/reject", {id}); list(); counts(); });
     on("[data-rm]", async (id, v) => { if (!confirm(`「${v.title}」を検索の対象から外しますか？`)) return; await api("/api/docs/remove", {id}); list(); });
     on("[data-ed]", (id, v) => {
       const box = modal(`<h2>承認前の修正</h2><label class="f"><span>文書名</span><input class="i" id="et" value="${esc(v.title)}"></label>
         <label class="f" style="margin-top:8px"><span>版</span><input class="i" id="ev" value="${esc(v.version)}"></label><label class="f" style="margin-top:8px"><span>発行元</span><input class="i" id="ei" value="${esc(v.insurer || "")}"></label>
-        <div class="row end" style="margin-top:12px"><button class="btn" onclick="closeModal()">やめる</button><button class="btn p" id="es">保存</button></div>`);
+        <div class="row end" style="margin-top:12px"><button class="btn" data-close>やめる</button><button class="btn p" id="es">保存</button></div>`);
       box.querySelector("#es").onclick = async () => { await api("/api/docs/edit", {id, title: $("#et").value, version: $("#ev").value, insurer: $("#ei").value}); closeModal(); list(); };
     });
   };
@@ -636,7 +638,7 @@ LOAD.vault = async () => {
       const r = rs.find(x => x.id === +b.dataset.kind);
       const box = modal(`<h2>種目変更の申請（文書ID ${r.id}）</h2><p class="hint">今の種目：${esc(r.kinds)}／登録日 ${esc(r.registered)}。承認されると、満了日を<b>元の登録日から</b>計算し直し、変更ログに残します。</p>
         <div class="checks">${META.kinds.map(k => `<label><input type="checkbox" value="${esc(k)}">${esc(k)}</label>`).join("")}</div>
-        <div class="row end" style="margin-top:12px"><button class="btn" onclick="closeModal()">やめる</button><button class="btn p" id="kreq">申請</button></div><div class="msgline" id="km"></div>`);
+        <div class="row end" style="margin-top:12px"><button class="btn" data-close>やめる</button><button class="btn p" id="kreq">申請</button></div><div class="msgline" id="km"></div>`);
       box.querySelector("#kreq").onclick = async () => { const x = await api("/api/vault/request", {copy_id: r.id, type: "kind", kinds: [...box.querySelectorAll("input:checked")].map(i => i.value)}); if (x.error) return say($("#km"), x); closeModal(); list(); counts(); reqs(); };
     });
     $("#vlist").querySelectorAll("[data-hold]").forEach(b => b.onclick = async () => {
@@ -644,7 +646,7 @@ LOAD.vault = async () => {
       if (r.legal_hold) { if (!confirm("ホールドの解除を申請しますか？（承認後、満了していれば次の日次ジョブで削除されます）")) return; const x = await api("/api/vault/request", {copy_id: r.id, type: "unhold"}); if (x.error) alert(x.error); list(); reqs(); return; }
       const box = modal(`<h2>リーガルホールドの申請（文書ID ${r.id}）</h2><p class="hint">紛争中・事故対応中などで、満了後も残す必要があるときに申請します。生成AI責任者（管理者）が承認した場合だけ削除を保留し、6か月ごとに見直します。</p>
         <select class="i" id="hr">${Object.entries(META.hold_reasons).map(([k, v]) => `<option value="${k}">${k}：${esc(v)}</option>`).join("")}</select>
-        <div class="row end" style="margin-top:12px"><button class="btn" onclick="closeModal()">やめる</button><button class="btn p" id="hreq">申請</button></div><div class="msgline" id="hm"></div>`);
+        <div class="row end" style="margin-top:12px"><button class="btn" data-close>やめる</button><button class="btn p" id="hreq">申請</button></div><div class="msgline" id="hm"></div>`);
       box.querySelector("#hreq").onclick = async () => { const x = await api("/api/vault/request", {copy_id: r.id, type: "hold", reason: $("#hr").value}); if (x.error) return say($("#hm"), x); closeModal(); list(); counts(); reqs(); };
     });
   };
@@ -701,7 +703,7 @@ LOAD.monthly = async (month) => {
   const el = $("#p-monthly");
   const m = await api("/api/monthly?month=" + (month || today().slice(0, 7)));
   const blocked = m.blocked.reduce((s, x) => s + x.n, 0);
-  el.innerHTML = `<div class="row" style="margin-bottom:12px"><input class="i" type="month" id="mmonth" value="${esc(m.month)}" style="width:auto"><button class="btn" id="mgo">表示</button><span class="sp"></span><button class="btn" onclick="window.print()"><i class="fa-solid fa-print"></i>印刷して記録に残す</button></div>
+  el.innerHTML = `<div class="row" style="margin-bottom:12px"><input class="i" type="month" id="mmonth" value="${esc(m.month)}" style="width:auto"><button class="btn" id="mgo">表示</button><span class="sp"></span><button class="btn" data-print><i class="fa-solid fa-print"></i>印刷して記録に残す</button></div>
     <div class="stat"><div><b class="${blocked ? "ng-t" : "ok-t"}">${blocked}</b><span>禁止情報の入力（ガードで停止）</span></div>
       <div><b class="${m.chain.ok ? "ok-t" : "ng-t"}">${m.chain.ok ? "OK" : "NG"}</b><span>監査ログの改ざんチェック</span></div>
       <div><b class="${m.vault.ok ? "ok-t" : "ng-t"}">${m.vault.ok ? "一致" : "不一致"}</b><span>申込書控えの削除件数</span></div>
