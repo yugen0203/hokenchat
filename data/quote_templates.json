@@ -3,10 +3,10 @@
   "kinds": {
     "自動車": [
       {"key": "contractor", "label": "契約者名", "required": true},
-      {"key": "start", "label": "始期日（YYYY-MM-DD）", "required": true},
+      {"key": "start", "label": "始期日", "required": true, "type": "date"},
       {"key": "car_name", "label": "車名", "required": true},
       {"key": "car_model", "label": "型式", "required": true},
-      {"key": "first_reg", "label": "初度登録年月", "required": true},
+      {"key": "first_reg", "label": "初度登録年月", "required": true, "type": "month"},
       {"key": "grade", "label": "ノンフリート等級", "required": false},
       {"key": "driver_age", "label": "運転者年齢条件", "required": true},
       {"key": "driver_limit", "label": "運転者限定（本人・夫婦・家族・限定なし）", "required": true},
@@ -17,10 +17,10 @@
     ],
     "火災": [
       {"key": "contractor", "label": "契約者名", "required": true},
-      {"key": "start", "label": "始期日（YYYY-MM-DD）", "required": true},
+      {"key": "start", "label": "始期日", "required": true, "type": "date"},
       {"key": "location", "label": "建物の所在地", "required": true},
       {"key": "structure", "label": "構造（M・T・H構造）", "required": true},
-      {"key": "built", "label": "建築年月", "required": true},
+      {"key": "built", "label": "建築年月", "required": true, "type": "month"},
       {"key": "floor_area", "label": "延床面積（㎡）", "required": true},
       {"key": "building_sum", "label": "建物の保険金額", "required": true},
       {"key": "contents_sum", "label": "家財の保険金額", "required": false},
@@ -30,7 +30,7 @@
     ],
     "その他": [
       {"key": "contractor", "label": "契約者名", "required": true},
-      {"key": "start", "label": "始期日（YYYY-MM-DD）", "required": true},
+      {"key": "start", "label": "始期日", "required": true, "type": "date"},
       {"key": "product", "label": "商品・種目", "required": true},
       {"key": "coverage", "label": "希望する補償内容", "required": true},
       {"key": "memo", "label": "その他の要望", "required": false}

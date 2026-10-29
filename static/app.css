@@ -176,3 +176,7 @@ body.locked .gate { display:grid; }
 .drawer .n { padding:10px 14px; border-bottom:1px solid var(--bd); font-size:12px; }
 .drawer .n b { font-size:13px; display:block; margin-bottom:2px; } .drawer .n.unread { background:#f8faff; }
 .drawer .n.warn b { color:var(--amber); } .drawer .n.error b { color:var(--warn); }
+
+/* カレンダーの欄：表の中でも日付が切れない幅にし、アイコンを押しやすくする */
+input.i[type="date"], input.i[type="month"] { min-width:150px; cursor:pointer; }
+input.i::-webkit-calendar-picker-indicator { cursor:pointer; opacity:.7; }

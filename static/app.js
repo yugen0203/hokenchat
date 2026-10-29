@@ -25,6 +25,16 @@ const allowed = () => (ME?.purpose && META.purpose_fields[ME.purpose]) || null;
 const say = (el, r, okText) => { el.className = "msgline " + (r.error ? "ng" : "ok"); el.textContent = r.error || okText || "保存しました"; };
 const today = () => new Date().toISOString().slice(0, 10);
 const openFile = url => window.open(url, "_blank", "width=900,height=900");
+// 日付・年月の入力欄（カレンダーで選ぶ）。形式の違う値が入っているときは消さずに文字の欄で出し、直してもらう
+const DATE_RE = {date: /^\d{4}-\d{2}-\d{2}$/, month: /^\d{4}-\d{2}$/};
+function dateInput(type, attrs, v) {
+  v = String(v ?? "");
+  if (type === "month" && DATE_RE.date.test(v)) v = v.slice(0, 7);
+  const ok = !v || DATE_RE[type].test(v);
+  return `<input class="i ${ok ? "" : "miss"}" type="${ok ? type : "text"}" ${attrs} value="${esc(v)}" ${ok ? "" : `title="${type === "month" ? "YYYY-MM" : "YYYY-MM-DD"} の形に直してください"`}>`;
+}
+// 欄のどこを押してもカレンダーを開く（アイコンだけだと押しにくい）
+document.addEventListener("click", e => { const i = e.target.closest('input[type="date"],input[type="month"]'); if (i && !i.readOnly) try { i.showPicker(); } catch {} });
 
 // ---------- モーダル ----------
 function modal(html) { $("#mbox").innerHTML = html; $("#modal").classList.add("on"); return $("#mbox"); }
@@ -360,7 +370,7 @@ LOAD.customers = () => {
 function custForm(c, a, edit, drafted) {
   const L = META.labels, ro = edit ? "" : "readonly";
   const fld = k => a.includes(k) ? `<label class="f ${k === "name" ? "req" : ""}"><span>${L[k]}</span>${k === "note" ? `<textarea class="i" name="${k}" ${ro}>${esc(c[k] || "")}</textarea>` : `<input class="i" name="${k}" value="${esc(c[k] || "")}" ${ro}>`}</label>` : "";
-  const prow = p => `<tr>${PF.map(k => `<td><input class="i" data-p="${k}" value="${esc(p[k] || "")}" ${ro} ${k === "start" || k === "expiry" ? 'placeholder="YYYY-MM-DD"' : ""}></td>`).join("")}${edit ? `<td><button class="btn s d" data-del>×</button></td>` : ""}</tr>`;
+  const prow = p => `<tr>${PF.map(k => `<td>${k === "start" || k === "expiry" ? dateInput("date", `data-p="${k}" ${ro}`, p[k]) : `<input class="i" data-p="${k}" value="${esc(p[k] || "")}" ${ro}>`}</td>`).join("")}${edit ? `<td><button class="btn s d" data-del>×</button></td>` : ""}</tr>`;
   $("#cform").innerHTML = `<h2><i class="fa-regular fa-user"></i>${c.id ? "顧客ID " + c.id : "新規の顧客"}${drafted ? ` <span class="tag am">AIの下書き・未登録</span>` : ""}</h2>
     <form id="cf"><div class="grid2">${fld("name")}${fld("kana")}${fld("postal")}${fld("phone")}</div>${fld("address")}${fld("email")}${fld("note")}
     ${a.includes("policies") ? `<h2 style="margin-top:14px"><i class="fa-regular fa-file-lines"></i>契約概要</h2><div class="tbl"><table id="ptab"><tr>${PF.map(k => `<th>${L[k]}</th>`).join("")}${edit ? "<th></th>" : ""}</tr>${(c.policies || []).map(prow).join("")}</table></div>
@@ -480,7 +490,8 @@ function qdetail(q) {
   $("#qdetail").innerHTML = `<h2><i class="fa-regular fa-file-lines"></i>見積依頼 No.${q.id}（${esc(q.kind)}） <span class="tag">${esc(q.status)}</span></h2>
     <p class="hint">作成：${esc(q.created_name || "")}　承認：${esc(q.approved_name || "—")}</p>
     <form id="qf">${q.template.map(f => `<label class="f ${f.required ? "req" : ""}" style="margin-bottom:8px"><span>${esc(f.label)}</span>
-      <input class="i ${f.required && !q.fields[f.key] ? "miss" : ""}" name="${esc(f.key)}" value="${esc(q.fields[f.key] || "")}" ${lock}></label>`).join("")}
+      ${f.type ? dateInput(f.type, `name="${esc(f.key)}" ${lock}`, q.fields[f.key]).replace('class="i ', `class="i ${f.required && !q.fields[f.key] ? "miss" : ""} `)
+        : `<input class="i ${f.required && !q.fields[f.key] ? "miss" : ""}" name="${esc(f.key)}" value="${esc(q.fields[f.key] || "")}" ${lock}>`}</label>`).join("")}
     <div class="row">${lock ? "" : `<button class="btn">保存</button><button type="button" class="btn p" id="qapp" ${q.missing.length ? "disabled" : ""}>確認して承認</button>`}
       ${["承認済", "突合済", "差異あり", "成約"].includes(q.status) ? `<button type="button" class="btn" id="qsheet"><i class="fa-regular fa-file-pdf"></i>J-NET入力票</button>` : ""}</div>
     <div class="msgline" id="qdm"></div></form>
