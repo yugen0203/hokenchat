@@ -139,11 +139,25 @@ const VIEWS = {
   admin: ["社員・設定", "アカウント・ロール・AI停止スイッチ・差出人情報"],
 };
 const LOAD = {};
-function show(v) {
+// 利用目的（F-02）は画面で決める。顧客DBだけは開く理由が人によって違うので、画面の中で選んでもらう
+const VIEW_PURPOSE = {internal: "約款・規程の検索", line: "お客さま対応", mailing: "送付状作成", quotes: "見積依頼", vault: "契約管理",
+                      docs: "文書管理", tasks: "社内事務", audit: "社内事務", monthly: "社内事務", admin: "社内事務"};
+let CUST_LAST = "";
+const CUST_PURPOSES = [["契約管理", "登録・修正"], ["更改案内", "更改のご案内"], ["事故対応", "事故対応"], ["お客さま対応", "お問い合わせ対応"]];
+async function setPurpose(p) {
+  if ((ME.purpose || "") === p) return true;
+  const r = await api("/api/purpose", {purpose: p});
+  if (r.error) { alert(r.error); return false; }
+  ME.purpose = r.purpose;
+  return true;
+}
+async function show(v) {
   CUR = v;
   document.querySelectorAll("#nav button").forEach(b => b.classList.toggle("on", b.dataset.v === v));
   document.querySelectorAll(".view").forEach(s => s.classList.toggle("on", s.id === "v-" + v));
   [$("#title").textContent, $("#sub").textContent] = VIEWS[v];
+  if (v === "customers") await setPurpose(CUST_LAST);  // ログイン中は、前に選んだ目的を覚えておく
+  else if (!await setPurpose(VIEW_PURPOSE[v] || "")) return;
   LOAD[v]?.();
 }
 function startApp() {
@@ -151,29 +165,18 @@ function startApp() {
   $("#me").innerHTML = `<b>${esc(ME.name)}</b>（${esc(ME.role_name)}）`;
   document.querySelectorAll("#nav [data-p]").forEach(el => el.hidden = !can(el.dataset.p));
   document.querySelectorAll("#nav button").forEach(b => b.onclick = () => show(b.dataset.v));
-  const sel = $("#purpose");
-  sel.innerHTML = `<option value="">（選んでください）</option><optgroup label="顧客情報を使う">${META.purposes.map(p => `<option>${esc(p)}</option>`).join("")}</optgroup>
-    <optgroup label="顧客情報を使わない">${META.purposes_other.map(p => `<option>${esc(p)}</option>`).join("")}</optgroup>`;
-  sel.value = ME.purpose || "";
-  sel.onchange = async () => {
-    const r = await api("/api/purpose", {purpose: sel.value});
-    if (r.error) return alert(r.error);
-    ME.purpose = r.purpose; sel.classList.remove("need"); LOAD[CUR]?.();
-  };
   initChat(); initLine();
   show("internal");
   health(); setInterval(health, 15000);
   notifs(); setInterval(notifs, 30000);
   counts(); setInterval(counts, 60000);
 }
-function needPurpose() { $("#purpose").classList.add("need"); $("#purpose").focus(); }
+// 目的は画面を開いたときに決める。ここに来るのは、目的を設定できなかった（通信の失敗など）ときだけ
+function needPurpose() {}
 function purposeGate(el, fields, what) {
   const a = allowed();
   if (a && fields.every(f => a.includes(f))) return a;
-  el.innerHTML = `<div class="card"><h2><i class="fa-solid fa-tag"></i>利用目的を選んでください</h2>
-    <p class="hint">${esc(what)}には顧客情報を使います。画面右上の「利用目的」で目的を選ぶと、その目的に必要な項目だけが表示されます（要件 F-02）。<br>
-    使える目的：${esc(META.purposes.filter(p => fields.every(f => META.purpose_fields[p].includes(f))).join("・"))}</p></div>`;
-  needPurpose();
+  el.innerHTML = `<div class="card"><div class="empty">${esc(what)}を開けませんでした。左のメニューからもう一度開いてください。</div></div>`;
   return null;
 }
 
@@ -313,7 +316,7 @@ function openTalk(u) {
   setLMode(); loadUsers(); loadMsgs(true);
 }
 async function linkCustomer() {
-  if (!ME.purpose || ME.purpose !== "お客さま対応") { alert("顧客とのひも付けは、利用目的「お客さま対応」を選んでから行ってください（本人確認のあとに行います）"); return needPurpose(); }
+  if (!await setPurpose("お客さま対応")) return;
   const box = modal(`<h2>顧客DBとひも付け</h2><p class="hint">お電話などで<b>本人確認が済んだ場合だけ</b>ひも付けてください。LINEの表示名だけで判断しないでください。</p>
     <div class="row"><input class="i" id="lq" placeholder="氏名・フリガナ・電話で検索" style="flex:1"><button class="btn" id="lqb">検索</button></div>
     <div id="lqr" style="margin-top:10px"></div><div class="row end" style="margin-top:12px">${LCUR.customer_id ? `<button class="btn d" id="lunlink">ひも付けを外す</button>` : ""}<button class="btn" data-close>閉じる</button></div>`);
@@ -336,8 +339,12 @@ const CF = ["name", "kana", "postal", "address", "phone", "email", "note"];
 const PF = ["insurer", "kind", "policy_no", "start", "expiry"];
 let CSEL = null;
 LOAD.customers = () => {
-  const el = $("#p-customers"), a = purposeGate(el, ["name"], "顧客DB");
-  if (!a) return;
+  const host = $("#p-customers");
+  host.innerHTML = `<div class="card"><h2><i class="fa-solid fa-tag"></i>何のために開きますか <small>選んだ目的に必要な項目だけを表示し、監査ログに残します</small></h2>
+    <div class="seg pick" id="cpur">${CUST_PURPOSES.map(([p, l]) => `<button type="button" data-purpose="${p}" class="${ME.purpose === p ? "on" : ""}">${esc(l)}</button>`).join("")}</div></div><div id="p-cust"></div>`;
+  host.querySelectorAll("#cpur button").forEach(b => b.onclick = async () => { if (await setPurpose(b.dataset.purpose)) { CUST_LAST = b.dataset.purpose; CSEL = null; LOAD.customers(); } });
+  const el = $("#p-cust"), a = allowed();
+  if (!CUST_PURPOSES.some(([p]) => p === ME.purpose) || !a) return el.innerHTML = `<div class="empty">上のボタンで目的を選ぶと、顧客を検索できます。登録・修正・CSVの取り込みは「登録・修正」で行います。</div>`;
   const edit = ME.purpose === "契約管理";
   el.innerHTML = `<div class="cols"><div>
       <div class="card"><h2><i class="fa-solid fa-magnifying-glass"></i>検索</h2><div class="row"><input class="i" id="cq" placeholder="氏名・フリガナ・電話・顧客ID" style="flex:1"><button class="btn" id="cqb">検索</button>
@@ -353,7 +360,7 @@ LOAD.customers = () => {
         <div class="row"><a class="btn s" href="/api/customers/csv-template"><i class="fa-solid fa-download"></i>テンプレートをダウンロード</a></div>
         <div class="row" style="margin-top:8px"><input class="i" type="file" id="ccsv" accept=".csv,text/csv" style="flex:1"><button class="btn" id="ccsvchk">内容を確認</button></div>
         <div id="ccsvres" style="margin-top:8px"></div></div>` : ""}
-    </div><div><div class="card" id="cform"><div class="empty">左の一覧から顧客を選ぶ${edit ? "か、［新規］を押してください" : "と、利用目的「" + esc(ME.purpose) + "」で見られる項目だけを表示します"}</div></div></div></div>`;
+    </div><div><div class="card" id="cform"><div class="empty">左の一覧から顧客を選ぶ${edit ? "か、［新規］を押してください" : "と、「" + esc(CUST_PURPOSES.find(([p]) => p === ME.purpose)[1]) + "」に必要な項目だけを表示します"}</div></div></div></div>`;
   const find = async () => {
     const rs = await api("/api/customers?q=" + encodeURIComponent($("#cq").value));
     $("#clist").innerHTML = Array.isArray(rs) && rs.length ? `<div class="tbl"><table><tr><th>ID</th><th>氏名</th>${a.includes("phone") ? "<th>電話</th>" : ""}${a.includes("address") ? "<th>住所</th>" : ""}</tr>
