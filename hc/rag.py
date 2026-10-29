@@ -109,9 +109,19 @@ def _doc_id(con, title, insurer):
 def seed():
     """初回：data/docs/*.md（架空の約款・規程）を承認済みで取り込む。旧版（第0.1版）の chunks テーブルは捨てる"""
     con = db.connect()
+    try:  # 埋め込みの失敗（モデル未導入など）で書き込み中の接続を残すと、DB 全体がロックされる
+        n = _seed(con)
+    finally:
+        con.close()
+    if n:
+        _bump()
+        print("初期文書の取り込み:", n, "件")
+    return n
+
+
+def _seed(con):
     con.execute("DROP TABLE IF EXISTS chunks")
     if con.execute("SELECT count(*) FROM document_version").fetchone()[0]:
-        con.close()
         return 0
     n = 0
     for f in sorted(SEED_DOCS.glob("*.md")):
@@ -125,9 +135,6 @@ def seed():
         _store_chunks(con, vid, meta["title"], arts)
         n += len(arts)
     con.commit()
-    con.close()
-    _bump()
-    print("初期文書の取り込み:", n, "件")
     return n
 
 
