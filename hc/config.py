@@ -58,5 +58,10 @@ HOLD_REASONS = {"H1": "紛争・訴訟中", "H2": "事故対応中", "H3": "保�
 
 LINE_RETENTION_DAYS = 90       # トーク・添付（N-16）
 TASK_RETENTION_DAYS = 365      # 完了したタスク（N-16）
+# 担当グループ（第2.0版 R-02）。ponytail: 固定。分け方が決まったら（確認事項 Q-04）ここを直す
+TASK_GROUPS = ["自動車・個人", "自動車・法人", "火災新種", "事故", "その他"]
+STALL_HOURS = 24               # この時間動きのない LINE の依頼を知らせる（Q-03 で決める。画面の設定で上書き可）
+FORM_DAYS = 7                  # 見積依頼フォーム・書類アップロードのリンクの有効期限
+TASK_FILES = DATA / "task_files"  # 依頼に付いた車検証・免許証など（暗号化。AI は読まない）
 QUOTE_RETENTION_DAYS = 365     # 成約しなかった見積依頼書（N-16）
 SESSION_HOURS = 9

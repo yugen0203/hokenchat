@@ -168,6 +168,92 @@ class T(unittest.TestCase):
         self.assertEqual(db.one("SELECT count(*) AS n FROM customer")["n"], before + 1)
         self.assertIn("顧客ID 999999", imp("顧客ID,氏名\r\n999999,x\r\n".encode())[1]["errors"][0])
 
+    # ---- 公式LINEの社内グループでのタスク管理（第2.0版 R-01〜R-05・R-07・R-10） ----
+    def test_line_group_tasks(self):
+        from hc import linetask, line, forms
+        sent = []
+        line.push = lambda to, text: sent.append((to, text))  # 受付サーバーの送信口の代わり
+        G, ME = "Cgroup0001", "Uadmin0001"
+        say = lambda text, mention=False, quoted=None, user=ME, mid=None: linetask.handle(
+            {"type": "message", "group_id": G, "user_id": user, "msg_id": mid, "text": ("@hokenchat " if mention else "") + text, "command": text,
+             "mention_self": mention, "quoted_id": quoted}).get("reply") or ""
+        self.assertIn("担当", linetask.handle({"type": "join", "group_id": G, "group_name": "自動車（法人）"})["reply"])
+        self.assertIn("登録されていません", say("一覧", True))                       # LINE をつないでいない人は使えない
+        code = self.admin.req("/api/line/linkcode", {})[1]["code"]
+        self.assertIn("つなぎました", say(f"連携 {code}", True))
+        self.assertIn("決まっていません", say("一覧", True))                          # 担当グループが未設定
+        self.assertEqual(self.jimu.req("/api/line/groups/set", {"group_id": G, "task_group": "自動車・法人"})[0], 403)  # 設定は管理者だけ
+        self.assertEqual(self.admin.req("/api/line/groups/set", {"group_id": G, "task_group": "自動車・法人"})[0], 200)
+        # 依頼のメッセージにリプライしてメンション → タスク
+        say("小林工業さん ハイエースとプロボックス入替お願いします。車検証送ります", mid="m1")
+        r = say("", True, quoted="m1", mid="m2")
+        tid = int(r.split("No.")[1].split("「")[0])
+        t = db.one("SELECT * FROM task WHERE id=?", tid)
+        self.assertEqual((t["group_name"], t["source"], t["line_msg_id"]), ("自動車・法人", "line", "m1"))
+        self.assertIn("登録済み", say("", True, quoted="m1"))                        # 同じ依頼は二重に登録しない
+        # 元の依頼へのリプライは経過になり、「完了」で完了する
+        say("車検証届きました、入力中です", quoted="m1")
+        self.assertEqual(db.one("SELECT count(*) AS n FROM task_event WHERE task_id=? AND kind='reply'", tid)["n"], 1)
+        self.assertIn("No.", say("一覧", True))
+        self.assertIn("小林", say("検索 小林工業", True))
+        self.assertIn("対応中", say(f"No.{tid} 対応中", True))
+        self.assertIn("完了", say("完了しました", quoted="m1"))
+        self.assertEqual(db.one("SELECT status FROM task WHERE id=?", tid)["status"], "完了")
+        # ガード：病歴などはタスクにせず、控えにも残さない
+        self.assertIn("タスクにしませんでした", say("持病の糖尿病で通院中の方の件", True, mid="m3"))
+        self.assertIsNone(db.one("SELECT 1 FROM lg_msg WHERE msg_id='m3'"))
+        # 止まった依頼：設定時間動きがなければ1回だけ知らせる（平日のみ）。動きがあれば数え直す
+        r2 = say("火曜までに藤本さん宛ての証券再発行", True, mid="m4")
+        t2 = int(r2.split("No.")[1].split("「")[0])
+        db.run("UPDATE task SET last_activity='2026-11-01 09:00:00' WHERE id=?", t2)
+        mon = dt.datetime(2026, 11, 16, 10, 0)
+        self.assertEqual(linetask.check_stalled(mon, send=lambda to, m: sent.append((to, m))), 1)
+        self.assertEqual(linetask.check_stalled(mon, send=lambda to, m: sent.append((to, m))), 0)
+        self.assertEqual(linetask.check_stalled(dt.datetime(2026, 11, 15, 10, 0)), 0)  # 日曜は知らせない
+        self.assertTrue(any(f"No.{t2}" in m and to == G for to, m in sent))
+        lst = self.admin.req("/api/tasks?q=" + urllib.parse.quote("証券再発行"))[1]
+        self.assertEqual([x["id"] for x in lst["tasks"]], [t2])
+        # 見積依頼フォーム（使い切りリンク）
+        self.assertIn("公開URL", say("見積", True))
+        self.admin.req("/api/line/taskline-settings", {"public_url": "https://example.trycloudflare.com", "stall_hours": 24})
+        tok = say("見積", True).split("/f/")[1].strip()
+        self.assertIn("見積依頼", forms.page(tok)[1])
+        jpg = b"\xff\xd8\xff\xe0" + b"0" * 100
+        def multipart(fields, files):
+            bd = "----hcboundary"
+            parts = [f'--{bd}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n'.encode() for k, v in fields.items()]
+            parts += [f'--{bd}\r\nContent-Disposition: form-data; name="{k}"; filename="a.jpg"\r\nContent-Type: image/jpeg\r\n\r\n'.encode() + d + b"\r\n"
+                      for k, d in files.items()]
+            return f"multipart/form-data; boundary={bd}", b"".join(parts) + f"--{bd}--\r\n".encode()
+        ct, body = multipart({"kind": "新規", "name": "架空 太郎", "car": "プリウス", "vehicle": "必要"}, {"shaken": jpg})
+        self.assertIn("受け付けました", forms.submit(tok, ct, body)[1])
+        q = db.one("SELECT * FROM task ORDER BY id DESC LIMIT 1")
+        self.assertEqual((q["title"], q["group_name"]), ("見積 新規 架空 プリウス", "自動車・法人"))
+        self.assertIn("未着の書類：免許証", q["detail"])
+        self.assertIn("このリンクは使えません", forms.submit(tok, ct, body)[1])             # 1回限り
+        self.assertIn("No.", sent[-1][1])                                                  # グループに受付を知らせる
+        # 書類のアップロード用リンク → タスクに付く。開けるのは管理者・事務員
+        utok = say(f"書類 No.{q['id']}", True).split("/f/")[1].strip()
+        ct, body = multipart({}, {"menkyo": jpg})
+        self.assertIn("受け付けました", forms.submit(utok, ct, body)[1])
+        ct, body = multipart({"kind": "新規", "name": "x", "car": "y"}, {"other": b"MZ\x90\x00"})
+        tok3 = say("見積", True).split("/f/")[1].strip()
+        self.assertIn("写真", forms.submit(tok3, ct, body)[1])                            # 写真・PDF以外は受け付けない
+        d = self.admin.req(f"/api/task?id={q['id']}")[1]
+        self.assertEqual([f["label"] for f in d["files"]], ["車検証", "免許証"])
+        self.assertEqual(self.admin.req(f"/api/tasks/file?id={d['files'][0]['id']}")[1], jpg)
+        agent = Client()
+        self.admin.req("/api/staff/create", {"login": "eigyo", "name": "営業 一郎", "role": "agent", "password": "Eigyo12345"})
+        agent.login("eigyo", "Eigyo12345")
+        self.assertEqual(agent.req(f"/api/tasks/file?id={d['files'][0]['id']}")[0], 403)  # 営業は書類を開けない
+        # 完了から1年たったタスクは、書類ごと暗号化消去される
+        ref = db.one("SELECT ref FROM task_file WHERE task_id=? LIMIT 1", q["id"])["ref"]
+        db.run("UPDATE task SET status='完了', done_at='2020-01-01 00:00:00' WHERE id=?", q["id"])
+        from hc import jobs
+        jobs.retention()
+        self.assertIsNone(db.one("SELECT 1 FROM task WHERE id=?", q["id"]))
+        self.assertFalse((Path(TMP) / "task_files" / f"{ref}.bin").exists())
+
     # ---- 文書の版管理 ----
     def test_docs_versions(self):
         txt = "第1条（目的）\n傷害保険の目的。\n第2条（入院保険金）\n入院保険金は180日以内の入院に支払う。".encode()

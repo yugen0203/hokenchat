@@ -58,7 +58,23 @@ CREATE TABLE IF NOT EXISTS quote(id INTEGER PRIMARY KEY, kind TEXT, customer_id 
   created_by INTEGER, approved_by INTEGER, created_at TEXT DEFAULT (datetime('now','localtime')), updated_at TEXT,
   reconcile TEXT, contract_copy_id INTEGER);
 CREATE TABLE IF NOT EXISTS task(id INTEGER PRIMARY KEY, title TEXT, detail TEXT, assignee INTEGER, due TEXT,
-  status TEXT DEFAULT '未着手', created_by INTEGER, created_at TEXT DEFAULT (datetime('now','localtime')), done_at TEXT);
+  status TEXT DEFAULT '未着手', created_by INTEGER, created_at TEXT DEFAULT (datetime('now','localtime')), done_at TEXT,
+  group_name TEXT, source TEXT DEFAULT 'app', line_group TEXT, line_msg_id TEXT, last_activity TEXT, stall_notified TEXT);
+-- タスクの経過（LINEのリプライ・状態の変更・メモ・添付）。検索と「止まった依頼」の判定に使う
+CREATE TABLE IF NOT EXISTS task_event(id INTEGER PRIMARY KEY, task_id INTEGER, ts TEXT DEFAULT (datetime('now','localtime')),
+  staff_id INTEGER, kind TEXT, text TEXT);
+CREATE TABLE IF NOT EXISTS task_file(id INTEGER PRIMARY KEY, task_id INTEGER, label TEXT, mime TEXT, size INTEGER, ref TEXT,
+  ts TEXT DEFAULT (datetime('now','localtime')));
+
+-- 公式LINE の社内グループ（第2.0版 R-01〜05）。グループごとに担当グループ（自動車・法人など）を割り当てる
+CREATE TABLE IF NOT EXISTS line_group(group_id TEXT PRIMARY KEY, name TEXT, task_group TEXT, joined_at TEXT DEFAULT (datetime('now','localtime')));
+CREATE TABLE IF NOT EXISTS staff_line(line_user_id TEXT PRIMARY KEY, staff_id INTEGER UNIQUE, linked_at TEXT DEFAULT (datetime('now','localtime')));
+CREATE TABLE IF NOT EXISTS line_link_code(code TEXT PRIMARY KEY, staff_id INTEGER, expires TEXT);
+-- リプライ先の依頼文を引くための短期の控え（7日で削除。ガードで止まった文は保存しない）
+CREATE TABLE IF NOT EXISTS lg_msg(msg_id TEXT PRIMARY KEY, group_id TEXT, line_user_id TEXT, text TEXT, ts TEXT DEFAULT (datetime('now','localtime')));
+-- 見積依頼フォーム・書類アップロードの使い切りリンク（token はハッシュだけ持つ）
+CREATE TABLE IF NOT EXISTS form_link(token_hash TEXT PRIMARY KEY, kind TEXT, staff_id INTEGER, group_id TEXT, task_id INTEGER,
+  expires TEXT, used_at TEXT);
 """
 
 _lock = threading.Lock()
@@ -91,6 +107,11 @@ def _migrate(con):
     """試作 第0.1版の DB から上げる（line_users に customer_id がない等）"""
     if "customer_id" not in _cols(con, "line_users"):
         con.execute("ALTER TABLE line_users ADD COLUMN customer_id INTEGER")
+    have = _cols(con, "task")  # 第0.2版の DB から上げる（タスクに担当グループと LINE の項目を足す）
+    for col, typ in (("group_name", "TEXT"), ("source", "TEXT DEFAULT 'app'"), ("line_group", "TEXT"), ("line_msg_id", "TEXT"),
+                     ("last_activity", "TEXT"), ("stall_notified", "TEXT")):
+        if col not in have:
+            con.execute(f"ALTER TABLE task ADD COLUMN {col} {typ}")
 
 
 def reset_for_tests():

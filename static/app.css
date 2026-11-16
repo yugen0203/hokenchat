@@ -180,3 +180,8 @@ input.i::-webkit-calendar-picker-indicator { cursor:pointer; opacity:.7; }
 /* 顧客DBの「何のために開きますか」 */
 .seg.pick { display:inline-flex; flex-wrap:wrap; } .seg.pick button { padding:8px 16px; font-size:13px; }
 .seg.pick button.on { background:var(--accent); color:#fff; }
+/* タスク（第2.0版）：担当グループの絞り込み・LINEの印・経過 */
+.tfilter { margin-bottom:12px; gap:8px; flex-wrap:wrap; }
+.tcard.click { cursor:pointer; } .tcard.click:hover { border-color:var(--accent); }
+.tcard .tags { display:flex; flex-wrap:wrap; gap:4px; margin:4px 0; } .tag.line { background:#e7f8ee; color:#067a3a; }
+.tlog { max-height:220px; overflow:auto; font-size:13px; display:grid; gap:6px; border:1px solid var(--bd); border-radius:8px; padding:8px; }

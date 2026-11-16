@@ -210,7 +210,7 @@ async function counts() {
   const set = (id, n) => { $(id).hidden = !n; $(id).textContent = n; };
   if (can("docs.approve")) { const d = await api("/api/docs"); if (Array.isArray(d)) set("#cnt-docs", d.filter(x => x.status === "pending").length); }
   if (can("vault.approve")) { const q = await api("/api/vault/requests"); if (Array.isArray(q)) set("#cnt-vault", q.length); }
-  if (can("task")) { const t = await api("/api/tasks"); if (t.summary) set("#cnt-tasks", t.summary.overdue); }
+  if (can("task")) { const t = await api("/api/tasks"); if (t.summary) set("#cnt-tasks", t.summary.overdue + t.summary.stalled); }
 }
 
 // =================== 社内チャット ===================
@@ -546,26 +546,44 @@ function qdetail(q) {
 
 // =================== タスク ===================
 let STAFF = [];
+let TFILTER = {group: "", q: ""};
 LOAD.tasks = async () => {
   const el = $("#p-tasks");
   STAFF = await api("/api/staff/names");
-  const r = await api("/api/tasks");
+  const [r, lg] = await Promise.all([api(`/api/tasks?group=${encodeURIComponent(TFILTER.group)}&q=${encodeURIComponent(TFILTER.q)}`), api("/api/line/groups")]);
   if (r.error) return el.innerHTML = `<div class="empty">${esc(r.error)}</div>`;
   const opt = sel => `<option value="">担当未定</option>` + STAFF.map(s => `<option value="${s.id}" ${s.id === sel ? "selected" : ""}>${esc(s.name)}</option>`).join("");
-  el.innerHTML = `<div class="stat"><div><b>${r.summary.open}</b><span>未完了</span></div><div><b class="${r.summary.overdue ? "ng-t" : ""}">${r.summary.overdue}</b><span>期限超過</span></div>
-      <div><b>${r.summary.today}</b><span>今日まで</span></div><div><b>${r.summary.unassigned}</b><span>担当未定</span></div></div>
-    <div class="card"><h2><i class="fa-solid fa-plus"></i>タスクを登録</h2>
-      <div class="row"><textarea class="i" id="tsrc" placeholder="依頼文を貼ると、AIが件名・担当・期限の案を作ります（例：山田さん、架空様の証券再発行の書類を金曜までに送ってください）" style="flex:1;min-height:56px"></textarea><button class="btn" id="tprop">案を作る</button></div>
-      <div class="grid3" style="margin-top:8px"><label class="f req"><span>件名</span><input class="i" id="ttitle"></label><label class="f"><span>担当</span><select class="i" id="tas">${opt()}</select></label>
-      <label class="f"><span>期限</span><input class="i" type="date" id="tdue"></label></div>
-      <label class="f" style="margin-top:8px"><span>詳細</span><textarea class="i" id="tdet" style="min-height:50px"></textarea></label>
-      <div class="row" style="margin-top:8px"><button class="btn p" id="tadd">登録（人が確定）</button></div><div class="msgline" id="tm"></div></div>
+  const gopt = sel => `<option value="">（なし）</option>` + META.task_groups.map(g => `<option ${g === sel ? "selected" : ""}>${esc(g)}</option>`).join("");
+  const adm = can("staff.manage");
+  el.innerHTML = `<div class="stat"><div><b>${r.summary.open}</b><span>未完了</span></div><div><b class="${r.summary.stalled ? "ng-t" : ""}">${r.summary.stalled}</b><span>止まっている依頼</span></div>
+      <div><b class="${r.summary.overdue ? "ng-t" : ""}">${r.summary.overdue}</b><span>期限超過</span></div><div><b>${r.summary.today}</b><span>今日まで</span></div></div>
+    <div class="row tfilter"><div class="seg pick" id="tgrp"><button type="button" data-g="" class="${TFILTER.group ? "" : "on"}">すべて</button>${META.task_groups.map(g => `<button type="button" data-g="${esc(g)}" class="${TFILTER.group === g ? "on" : ""}">${esc(g)}</button>`).join("")}</div>
+      <input class="i" id="tq" placeholder="検索（小林工業、ハイエース など）" value="${esc(TFILTER.q)}" style="flex:1;min-width:200px"><button class="btn" id="tqb"><i class="fa-solid fa-magnifying-glass"></i>検索</button></div>
     <div class="board">${META.task_statuses.map(s => `<div class="lane"><h3>${esc(s)}<span>${r.tasks.filter(t => t.status === s).length}</span></h3>
-      ${r.tasks.filter(t => t.status === s).map(t => `<div class="tcard ${t.overdue ? "over" : ""}"><b>No.${t.id} ${esc(t.title)}</b>
-        <small>${esc(t.assignee_name || "担当未定")}${t.due ? "・期限 " + esc(t.due) : ""}${t.overdue ? `　<span class="tag ng">期限超過</span>` : ""}</small>
-        ${t.detail ? `<div class="pre" style="margin-top:4px;color:var(--sub)">${esc(t.detail.slice(0, 140))}</div>` : ""}
-        <div class="row">${META.task_statuses.filter(x => x !== s).map(x => `<button class="btn s" data-t="${t.id}" data-s="${esc(x)}">${esc(x)}へ</button>`).join("")}
-        <select class="i" data-as="${t.id}" style="width:auto;padding:3px 6px;font-size:12px">${opt(t.assignee)}</select></div></div>`).join("")}</div>`).join("")}</div>`;
+      ${r.tasks.filter(t => t.status === s).map(t => `<div class="tcard click ${t.overdue || t.stalled ? "over" : ""}" data-open="${t.id}"><b>No.${t.id} ${esc(t.title)}</b>
+        <div class="tags">${t.group_name ? `<span class="tag">${esc(t.group_name)}</span>` : ""}${t.source === "line" ? `<span class="tag line"><i class="fa-regular fa-comment-dots"></i>LINE</span>` : ""}
+          ${t.stalled ? `<span class="tag ng">止まっている</span>` : ""}${t.overdue ? `<span class="tag ng">期限超過</span>` : ""}${t.files ? `<span class="tag"><i class="fa-regular fa-file"></i>${t.files}</span>` : ""}</div>
+        <small>${esc(t.assignee_name || "担当未定")}${t.due ? "・期限 " + esc(t.due) : ""}・最終 ${esc((t.last_activity || t.created_at || "").slice(5, 16))}</small></div>`).join("") || `<div class="empty" style="padding:12px">なし</div>`}</div>`).join("")}</div>
+    <div class="cols" style="margin-top:14px"><div><div class="card"><h2><i class="fa-solid fa-plus"></i>画面からタスクを登録 <small>LINEの依頼は、ボットにメンションすると自動で入ります</small></h2>
+      <div class="row"><textarea class="i" id="tsrc" placeholder="依頼文を貼ると、AIが件名・担当・期限の案を作ります" style="flex:1;min-height:56px"></textarea><button class="btn" id="tprop">案を作る</button></div>
+      <div class="grid2" style="margin-top:8px"><label class="f req"><span>件名</span><input class="i" id="ttitle"></label><label class="f"><span>担当グループ</span><select class="i" id="tgroup">${gopt(TFILTER.group)}</select></label>
+      <label class="f"><span>担当</span><select class="i" id="tas">${opt()}</select></label><label class="f"><span>期限</span><input class="i" type="date" id="tdue"></label></div>
+      <label class="f" style="margin-top:8px"><span>詳細</span><textarea class="i" id="tdet" style="min-height:50px"></textarea></label>
+      <div class="row" style="margin-top:8px"><button class="btn p" id="tadd">登録（人が確定）</button></div><div class="msgline" id="tm"></div></div></div>
+    <div><div class="card"><h2><i class="fa-regular fa-comment-dots"></i>自分のLINEをつなぐ</h2>
+      <p class="hint">${lg.linked ? "つないであります。LINEのグループで、ボットにメンションして依頼できます。" : "LINEの社内グループで依頼をタスクにするには、まず自分のLINEをhokenchatにつなぎます。"}</p>
+      <div class="row"><button class="btn" id="tlink">連携コードを出す</button></div><div id="tlinkout"></div></div>
+      ${adm ? `<div class="card"><h2><i class="fa-solid fa-user-gear"></i>LINEグループと通知の設定 <small>管理者</small></h2>
+        <p class="hint">公式LINE（ボット）を社内のLINEグループに招待すると、ここに出ます。グループごとに担当を選んでください。</p>
+        ${lg.groups.length ? `<div class="tbl"><table><tr><th>LINEグループ</th><th>担当グループ</th></tr>${lg.groups.map(g => `<tr><td>${esc(g.name)}<br><small class="time">${esc((g.joined_at || "").slice(0, 10))}に追加</small></td>
+          <td><select class="i" data-lg="${esc(g.group_id)}">${gopt(g.task_group)}</select></td></tr>`).join("")}</table></div>` : `<div class="empty">まだありません</div>`}
+        <div class="grid2" style="margin-top:10px"><label class="f"><span>止まった依頼を知らせるまで（時間・平日）</span><input class="i" id="tstall" type="number" min="1" max="240" value="${lg.stall_hours}"></label>
+          <label class="f"><span>フォーム用の公開URL（受付サーバー）</span><input class="i" id="tpub" placeholder="https://〜" value="${esc(lg.public_url)}"></label></div>
+        <div class="row" style="margin-top:8px"><button class="btn" id="tset">保存</button></div><div class="msgline" id="tsetm"></div></div>` : ""}</div></div>`;
+  el.querySelectorAll("#tgrp button").forEach(b => b.onclick = () => { TFILTER.group = b.dataset.g; LOAD.tasks(); });
+  const search = () => { TFILTER.q = $("#tq").value.trim(); LOAD.tasks(); };
+  $("#tqb").onclick = search; $("#tq").onkeydown = e => { if (e.key === "Enter") search(); };
+  el.querySelectorAll("[data-open]").forEach(c => c.onclick = () => taskDetail(+c.dataset.open));
   $("#tprop").onclick = async () => {
     $("#tm").className = "msgline"; $("#tm").textContent = "AIが案を作っています…";
     const p = await api("/api/tasks/propose", {text: $("#tsrc").value});
@@ -573,13 +591,41 @@ LOAD.tasks = async () => {
     $("#ttitle").value = p.title; $("#tas").value = p.assignee || ""; $("#tdue").value = p.due; $("#tdet").value = p.detail; say($("#tm"), {}, p.note);
   };
   $("#tadd").onclick = async () => {
-    const x = await api("/api/tasks/create", {title: $("#ttitle").value, assignee: +$("#tas").value || null, due: $("#tdue").value, detail: $("#tdet").value});
+    const x = await api("/api/tasks/create", {title: $("#ttitle").value, group: $("#tgroup").value, assignee: +$("#tas").value || null, due: $("#tdue").value, detail: $("#tdet").value});
     if (x.error) return say($("#tm"), x);
     LOAD.tasks(); counts();
   };
-  el.querySelectorAll("[data-t]").forEach(b => b.onclick = async () => { await api("/api/tasks/update", {id: +b.dataset.t, status: b.dataset.s}); LOAD.tasks(); counts(); });
-  el.querySelectorAll("[data-as]").forEach(s => s.onchange = async () => { await api("/api/tasks/update", {id: +s.dataset.as, assignee: +s.value || null}); LOAD.tasks(); });
+  $("#tlink").onclick = async () => {
+    const c = await api("/api/line/linkcode", {});
+    $("#tlinkout").innerHTML = c.error ? `<div class="msgline ng">${esc(c.error)}</div>` : `<div class="secret mono" style="margin-top:8px">${esc(c.code)}</div>
+      <p class="hint">${c.minutes}分以内に、LINEの社内グループ（またはボットとの1:1）で「<b>@ボットの名前 連携 ${esc(c.code)}</b>」と送ってください。</p>`;
+  };
+  el.querySelectorAll("[data-lg]").forEach(s => s.onchange = async () => { const x = await api("/api/line/groups/set", {group_id: s.dataset.lg, task_group: s.value}); if (x.error) alert(x.error); });
+  $("#tset")?.addEventListener("click", async () => say($("#tsetm"), await api("/api/line/taskline-settings", {stall_hours: $("#tstall").value, public_url: $("#tpub").value})));
 };
+async function taskDetail(id) {
+  const t = await api("/api/task?id=" + id);
+  if (t.error) return alert(t.error);
+  const kind = {create: "登録", reply: "LINEのリプライ", status: "状態", note: "メモ", file: "書類"};
+  const box = modal(`<h2>No.${t.id} ${esc(t.title)}</h2>
+    <p class="hint">${esc(t.group_name || "担当グループなし")}・${t.source === "line" ? "LINEから" : "画面から"}・登録 ${esc(t.created_name || "")} ${esc((t.created_at || "").slice(0, 16))}</p>
+    ${t.detail ? `<div class="pre" style="background:var(--bg);border-radius:8px;padding:10px;margin-bottom:10px">${esc(t.detail)}</div>` : ""}
+    <div class="grid3"><label class="f"><span>状態</span><select class="i" id="dst">${META.task_statuses.map(s => `<option ${s === t.status ? "selected" : ""}>${esc(s)}</option>`).join("")}</select></label>
+      <label class="f"><span>担当グループ</span><select class="i" id="dgr"><option value="">（なし）</option>${META.task_groups.map(g => `<option ${g === t.group_name ? "selected" : ""}>${esc(g)}</option>`).join("")}</select></label>
+      <label class="f"><span>担当</span><select class="i" id="das"><option value="">担当未定</option>${STAFF.map(s => `<option value="${s.id}" ${s.id === t.assignee ? "selected" : ""}>${esc(s.name)}</option>`).join("")}</select></label></div>
+    ${t.files.length ? `<h3 style="margin:12px 0 4px">書類</h3>${t.files.map(f => can("vault.view") ? `<button class="btn s" data-tf="${f.id}"><i class="fa-regular fa-file"></i>${esc(f.label)}</button>` : `<span class="tag">${esc(f.label)}</span>`).join(" ")}
+      ${can("vault.view") ? "" : `<p class="hint">書類を開けるのは管理者と事務員です</p>`}` : ""}
+    <h3 style="margin:12px 0 4px">経過</h3><div class="tlog">${t.events.map(e => `<div><small class="time">${esc(e.ts.slice(5, 16))}</small> <b>${esc(kind[e.kind] || e.kind)}</b> ${esc(e.name || "")}<div>${esc(e.text || "")}</div></div>`).join("") || `<div class="empty">なし</div>`}</div>
+    <div class="row" style="margin-top:8px"><input class="i" id="dnote" placeholder="メモを残す（電話の内容など。病歴などは書かない）" style="flex:1"><button class="btn" id="dnoteb">追加</button></div>
+    <div class="msgline" id="dm"></div><div class="row end" style="margin-top:12px"><button class="btn" data-close>閉じる</button><button class="btn p" id="dsave">保存</button></div>`);
+  box.querySelectorAll("[data-tf]").forEach(b => b.onclick = () => openFile("/api/tasks/file?id=" + b.dataset.tf));
+  box.querySelector("#dnoteb").onclick = async () => { const x = await api("/api/tasks/note", {id: t.id, text: $("#dnote").value}); if (x.error) return say($("#dm"), x); taskDetail(id); };
+  box.querySelector("#dsave").onclick = async () => {
+    const x = await api("/api/tasks/update", {id: t.id, status: $("#dst").value, group: $("#dgr").value, assignee: +$("#das").value || null});
+    if (x.error) return say($("#dm"), x);
+    closeModal(); LOAD.tasks(); counts();
+  };
+}
 
 // =================== 登録文書 ===================
 LOAD.docs = async () => {

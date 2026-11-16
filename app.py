@@ -12,7 +12,7 @@ import json, os, secrets, sys, threading, time, traceback, urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from hc import config, db, auth, audit, llm, rag, line, vault, customers, mailing, quotes, tasks, jobs
+from hc import config, db, auth, audit, llm, rag, line, vault, customers, mailing, quotes, tasks, jobs, linetask, forms
 from hc.auth import AuthError, require, require_customer_purpose
 from hc.config import ROOT, KEYS
 
@@ -51,7 +51,7 @@ def meta():
             "purpose_fields": config.PURPOSES, "kinds": vault.KINDS, "retention": config.RETENTION_YEARS,
             "hold_reasons": config.HOLD_REASONS, "doc_kinds": {k: v["items"] for k, v in mailing.DOC_KINDS.items()},
             "envelopes": [*mailing.ENVELOPES, "ラベル", "なし"], "quote_kinds": list(quotes.templates()),
-            "task_statuses": tasks.STATUSES, "labels": customers.LABELS}
+            "task_statuses": tasks.STATUSES, "task_groups": config.TASK_GROUPS, "labels": customers.LABELS}
 
 
 # ================= 認証 =================
@@ -192,6 +192,21 @@ def _line_test(r):
 @route("POST", "/api/line/incoming", "internal")
 def _line_in(r):
     return line.incoming(r.body)
+
+
+@route("POST", "/api/line/group", "internal")
+def _line_group(r):
+    return linetask.handle(r.body)
+
+
+@route("GET", "/api/form/page", "internal")
+def _form_page(r):
+    return File(forms.page(r.q("t"))[1].encode(), "text/html; charset=utf-8")
+
+
+@route("POST", "/api/form/submit", "internal", raw=True)
+def _form_submit(r):
+    return File(forms.submit(r.h("X-Form-Token"), r.h("X-Form-Type"), r.raw)[1].encode(), "text/html; charset=utf-8")
 
 
 @route("GET", "/api/line/users", "line")
@@ -416,7 +431,56 @@ def _quote_sheet(r):
 # ================= タスク =================
 @route("GET", "/api/tasks", "task")
 def _tasks(r):
-    return {"tasks": tasks.listing(), "summary": {k: (len(v) if isinstance(v, list) else v) for k, v in tasks.summary().items()}}
+    return {"tasks": tasks.listing(q=r.q("q"), group=r.q("group")),
+            "summary": {k: (len(v) if isinstance(v, list) else v) for k, v in tasks.summary().items()}}
+
+
+@route("GET", "/api/task", "task")
+def _task(r):
+    return tasks.detail(int(r.q("id"))) or {"error": "見つかりません"}
+
+
+@route("POST", "/api/tasks/note", "task")
+def _task_note(r):
+    return tasks.note(int(r.body["id"]), str(r.body.get("text") or ""), r.staff)
+
+
+@route("GET", "/api/tasks/file", "vault.view")
+def _task_file(r):
+    data, mime = forms.file_of(int(r.q("id")), r.staff)
+    return File(data, mime) if data else {"error": "見つかりません"}
+
+
+@route("GET", "/api/line/groups", "task")
+def _line_groups(r):
+    return {"groups": db.rows("SELECT group_id, name, task_group, joined_at FROM line_group ORDER BY joined_at"),
+            "public_url": db.setting("public_url") or "", "stall_hours": linetask.stall_hours(),
+            "linked": bool(db.one("SELECT 1 FROM staff_line WHERE staff_id=?", r.staff["id"]))}
+
+
+@route("POST", "/api/line/groups/set", "staff.manage")
+def _line_group_set(r):
+    return linetask.set_group(r.body.get("group_id"), r.body.get("task_group"), r.staff)
+
+
+@route("POST", "/api/line/taskline-settings", "staff.manage")
+def _taskline_settings(r):
+    url = str(r.body.get("public_url") or "").strip().rstrip("/")
+    if url and not url.startswith("https://"):
+        return {"error": "公開URLは https:// で始まるものにしてください"}
+    try:
+        hours = int(r.body.get("stall_hours") or config.STALL_HOURS)
+    except ValueError:
+        return {"error": "時間は数字で入れてください"}
+    db.set_setting("public_url", url)
+    db.set_setting("stall_hours", max(1, min(hours, 240)))
+    audit.log("settings", staff=r.staff, channel="task", result="taskline")
+    return {"ok": True}
+
+
+@route("POST", "/api/line/linkcode", "task")
+def _line_linkcode(r):
+    return linetask.link_code(r.staff)
 
 
 @route("POST", "/api/tasks/create", "task")

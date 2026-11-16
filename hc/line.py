@@ -105,6 +105,13 @@ def incoming(b):
     return {"reply": reply}
 
 
+def push(to, text):
+    """受付サーバーの送信口から LINE に送る（to はユーザーIDかグループID）"""
+    token = (KEYS / "internal.token").read_text(encoding="utf-8").strip()  # 受付サーバーの送信口に渡す合言葉
+    urllib.request.urlopen(urllib.request.Request(PUSH_URL, json.dumps({"to": to, "text": text}).encode(),
+                                                  {"Content-Type": "application/json", "X-Internal-Token": token}), timeout=30)
+
+
 def send(b, staff):
     """担当者が画面から送る（プッシュメッセージ）"""
     text = str(b.get("text") or "").strip()[:2000]
@@ -112,9 +119,7 @@ def send(b, staff):
         return {"error": "本文が空です"}
     if g := guard(text):
         return {"error": f"送信を止めました：{g}。LINEでは送れない情報です"}
-    token = (KEYS / "internal.token").read_text(encoding="utf-8").strip()  # 受付サーバーの送信口に渡す合言葉
-    urllib.request.urlopen(urllib.request.Request(PUSH_URL, json.dumps({"to": b["user_id"], "text": text}).encode(),
-                                                  {"Content-Type": "application/json", "X-Internal-Token": token}), timeout=30)
+    push(b["user_id"], text)
     con = db.connect()
     _save(con, b["user_id"], "staff", text, f"担当：{staff['name']}" + ("（AIの下書きを確認して送信）" if b.get("from_draft") else ""))
     con.commit()

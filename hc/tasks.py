@@ -5,20 +5,48 @@
   ※ 社内チャットアプリ（LINE WORKS 等）との連携は、アプリの外部委託申請の承認後に追加する（要件定義書 Q12）
 """
 import datetime as dt
-from . import db, audit, llm
+from . import db, audit, llm, linetask
 from .guard import guard
+from .config import TASK_GROUPS
 
 STATUSES = ["未着手", "対応中", "完了"]
 
 
-def listing(include_done=True):
-    rs = db.rows("""SELECT t.*, a.name AS assignee_name, c.name AS created_name FROM task t LEFT JOIN staff a ON a.id=t.assignee
+def listing(include_done=True, q="", group=""):
+    rs = db.rows("""SELECT t.*, a.name AS assignee_name, c.name AS created_name,
+                    (SELECT count(*) FROM task_file f WHERE f.task_id=t.id) AS files FROM task t LEFT JOIN staff a ON a.id=t.assignee
                     LEFT JOIN staff c ON c.id=t.created_by ORDER BY CASE t.status WHEN '完了' THEN 1 ELSE 0 END,
                     CASE WHEN t.due IS NULL OR t.due='' THEN 1 ELSE 0 END, t.due, t.id""")
     today = dt.date.today().isoformat()
+    stall = (dt.datetime.now() - dt.timedelta(hours=linetask.stall_hours())).strftime("%Y-%m-%d %H:%M:%S")
+    hit = {r["id"] for r in linetask.search(q, limit=500)} if q else None
     for r in rs:
         r["overdue"] = bool(r["due"] and r["status"] != "完了" and r["due"] < today)
-    return [r for r in rs if include_done or r["status"] != "完了"]
+        r["stalled"] = bool(r["source"] == "line" and r["status"] != "完了" and (r["last_activity"] or "") < stall)
+    return [r for r in rs if (include_done or r["status"] != "完了") and (not group or r["group_name"] == group)
+            and (hit is None or r["id"] in hit)]
+
+
+def detail(tid):
+    t = db.one("SELECT t.*, c.name AS created_name, a.name AS assignee_name FROM task t LEFT JOIN staff c ON c.id=t.created_by "
+               "LEFT JOIN staff a ON a.id=t.assignee WHERE t.id=?", tid)
+    if not t:
+        return None
+    t["events"] = db.rows("SELECT e.ts, e.kind, e.text, s.name FROM task_event e LEFT JOIN staff s ON s.id=e.staff_id WHERE e.task_id=? ORDER BY e.id", tid)
+    t["files"] = db.rows("SELECT id, label, mime, size, ts FROM task_file WHERE task_id=? ORDER BY id", tid)
+    return t
+
+
+def note(tid, text, staff):
+    text = text.strip()[:1000]
+    if not text:
+        return {"error": "メモが空です"}
+    if g := guard(text):
+        return {"error": f"入力できない情報があります（{g}）"}
+    if not db.one("SELECT 1 FROM task WHERE id=?", tid):
+        return {"error": "見つかりません"}
+    linetask.event(tid, "note", text, staff)
+    return {"ok": True}
 
 
 def _valid(b):
@@ -45,7 +73,9 @@ def create(b, staff):
     v, e = _valid(b)
     if e:
         return {"error": e}
-    tid = db.run("INSERT INTO task(title,detail,assignee,due,created_by) VALUES(?,?,?,?,?)", v["title"], v["detail"], v["assignee"], v["due"], staff["id"])
+    group = b.get("group") if b.get("group") in TASK_GROUPS else None
+    tid = db.run("INSERT INTO task(title,detail,assignee,due,created_by,group_name,last_activity) VALUES(?,?,?,?,?,?,?)",
+                 v["title"], v["detail"], v["assignee"], v["due"], staff["id"], group, linetask.now())
     audit.log("task_create", staff=staff, channel="task", refs=f"t{tid}")
     return {"ok": True, "id": tid}
 
@@ -57,12 +87,16 @@ def update(tid, b, staff):
     if "status" in b:
         if b["status"] not in STATUSES:
             return {"error": "状態が不正です"}
-        db.run("UPDATE task SET status=?, done_at=CASE WHEN ?='完了' THEN datetime('now','localtime') ELSE NULL END WHERE id=?", b["status"], b["status"], tid)
+        linetask.set_status(t, b["status"], staff, via="画面")
     if any(k in b for k in ("title", "detail", "due", "assignee")):
         v, e = _valid(t | {k: b[k] for k in ("title", "detail", "due", "assignee") if k in b})
         if e:
             return {"error": e}
         db.run("UPDATE task SET title=?, detail=?, due=?, assignee=? WHERE id=?", v["title"], v["detail"], v["due"], v["assignee"], tid)
+    if "group" in b:
+        if b["group"] and b["group"] not in TASK_GROUPS:
+            return {"error": "担当グループが不正です"}
+        db.run("UPDATE task SET group_name=? WHERE id=?", b["group"] or None, tid)
     audit.log("task_update", staff=staff, channel="task", refs=f"t{tid}", result=b.get("status", "edit"))
     return {"ok": True}
 
@@ -93,7 +127,7 @@ def summary():
     rs = listing(include_done=False)
     today = dt.date.today().isoformat()
     return {"open": len(rs), "overdue": [r for r in rs if r["overdue"]], "today": [r for r in rs if r["due"] == today],
-            "unassigned": [r for r in rs if not r["assignee"]]}
+            "unassigned": [r for r in rs if not r["assignee"] and not r["group_name"]], "stalled": [r for r in rs if r["stalled"]]}
 
 
 def morning_notice():
