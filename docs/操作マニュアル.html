@@ -1,4 +1,4 @@
-<title>hokenchat 操作マニュアル</title>
+<title>hokenchat 操作・機能説明書</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=M+PLUS+1+Code:wght@400;500&display=swap">
 <style>
@@ -70,9 +70,11 @@ footer { color: var(--sub); font-size: 12.5px; text-align: center }
 <div class="wrap">
 <nav class="toc" aria-label="目次">
   <div class="brand"><i>保</i>hokenchat</div>
-  <div class="ver">操作マニュアル（試作 第0.2.1版）</div>
+  <div class="ver">操作・機能説明書（試作 第0.3版）</div>
   <div class="links">
     <div class="g">はじめに</div>
+    <a href="#features">できること（機能一覧）</a>
+    <a href="#install">インストールと更新</a>
     <a href="#start">ログインと最初の設定</a>
     <a href="#purpose">利用目的とは</a>
     <a href="#roles">ロールとできること</a>
@@ -90,15 +92,58 @@ footer { color: var(--sub); font-size: 12.5px; text-align: center }
     <a href="#audit">監査ログ・月次点検</a>
     <a href="#admin">社員・設定</a>
     <div class="g">困ったとき</div>
+    <a href="#limits">まだできないこと</a>
     <a href="#faq">よくある質問</a>
   </div>
 </nav>
 
 <main><div class="inner">
 <header class="top">
-  <h1>hokenchat 操作マニュアル</h1>
-  <p>社内AIアシスタント（試作）の画面ごとの使い方です。AIもデータもこのPCの中だけで動きます。試作のデータはすべて架空で、実在のお客さまの情報は入れないでください。</p>
+  <h1>hokenchat 操作・機能説明書</h1>
+  <p>社内AIアシスタント（試作）でできることと、画面ごとの使い方です。AIもデータもこのPCの中だけで動きます。試作のデータはすべて架空で、実在のお客さまの情報は入れないでください。</p>
 </header>
+
+<section id="features">
+  <h2>できること（機能一覧）</h2>
+  <p class="lead">使う場所は2つです。社員のスマホの<b>LINE</b>（社内グループ）と、事務所のPCの<b>hokenchatの画面</b>です。</p>
+  <div class="tbl"><table>
+    <tr><th>機能</th><th>できること</th><th>使う場所</th><th>使う人</th></tr>
+    <tr><td><b>LINEの依頼のタスク化</b></td><td>社内のLINEグループで公式LINE（ボット）にメンションすると、依頼がタスクになります。担当グループ（自動車・法人など）に入り、経過と完了もLINEのリプライで残せます。</td><td>LINE・画面</td><td>全員</td></tr>
+    <tr><td><b>止まった依頼の通知</b></td><td>決めた時間（最初は24時間）動きのない依頼を、ボットがグループと管理者に知らせます。</td><td>LINE・画面</td><td>全員</td></tr>
+    <tr><td><b>見積依頼フォーム</b></td><td>LINEで「見積」と送ると、スマホで入力できるフォームのリンクが返ります。送った内容はタスクになります。</td><td>LINE・スマホ</td><td>営業</td></tr>
+    <tr><td><b>書類の受け取り</b></td><td>車検証・免許証を、1回だけ使えるリンクで受け取ります。暗号化して保管し、開けるのは管理者と事務員だけです。</td><td>LINE・スマホ</td><td>全員・お客さま</td></tr>
+    <tr><td><b>社内チャット</b></td><td>約款・規程を検索し、根拠の条文を原文のまま出典つきで表示します。</td><td>画面</td><td>全員</td></tr>
+    <tr><td><b>公式LINE（お客さま）</b></td><td>お客さまとの1対1のトークです。定型文での自動案内と、担当者の返信ができます。</td><td>画面</td><td>全員</td></tr>
+    <tr><td><b>顧客DB</b></td><td>顧客と契約の登録・検索です。メモからの下書きと、CSVでの一括登録ができます。</td><td>画面</td><td>全員</td></tr>
+    <tr><td><b>郵送</b></td><td>送付状・封筒・宛名ラベルのPDFを作ります。別の担当者が照合してから発送します。</td><td>画面</td><td>全員</td></tr>
+    <tr><td><b>見積依頼書</b></td><td>依頼文から見積依頼書の下書きを作り、J-NET入力票と、J-NETの結果との突合ができます。</td><td>画面</td><td>全員</td></tr>
+    <tr><td><b>登録文書</b></td><td>約款・規程を取り込み、管理者が承認した版だけを検索の対象にします。</td><td>画面</td><td>全員（承認は管理者）</td></tr>
+    <tr><td><b>文書保管庫</b></td><td>申込書控えを暗号化して保管し、保存期間が過ぎたら自動で消去します。</td><td>画面</td><td>全員（原本は管理者・事務員）</td></tr>
+    <tr><td><b>監査ログ・月次点検</b></td><td>誰が・いつ・何の目的で・何をしたかを記録し、改ざんを検出します。</td><td>画面</td><td>管理者</td></tr>
+    <tr><td><b>社員・設定</b></td><td>社員の追加、AI停止スイッチ、差出人の設定です。</td><td>画面</td><td>管理者</td></tr>
+  </table></div>
+  <div class="note tip"><b>守りの仕組み</b>　AIもデータも事務所のPCの中だけで動き、外部のAIサービスは使いません。病歴・マイナンバー・カード番号は、AIに渡す前に自動で止めます。ログインはID・パスワード・認証アプリの3つで行います。</div>
+</section>
+
+<section id="install">
+  <h2>インストールと更新</h2>
+  <p class="lead">プログラムは GitHub で配布しています。必要なPCは、Mac（macOS 12以降）または Windows 10・11、メモリ16GB以上、空き容量10GB以上です。ネット接続はセットアップのときだけ使います。</p>
+  <h3>新しく入れる</h3>
+  <ol class="steps">
+    <li>Python 3.10以上・Ollama・Git を入れます（くわしくは配布物の <span class="mono">SETUP.md</span> の2章）。</li>
+    <li>ターミナル（Windows は PowerShell）で <span class="mono">git clone https://github.com/yugen0203/hokenchat.git</span> を実行します。置き場所は、本人だけが使えるホームフォルダの下にします。</li>
+    <li>できた <span class="mono">hokenchat</span> フォルダの中で <span class="mono">python3 setup.py</span>（Windows は <span class="mono">py -3 setup.py</span>）を実行します。AIモデル（約6.4GB）のダウンロードに5〜30分かかります。</li>
+    <li>「セットアップ完了。」と出たら、デスクトップの <b class="ui">hokenchat</b> アイコンから起動します。</li>
+  </ol>
+  <div class="note tip"><b>AIに任せる場合</b>　Claude Code などのAIエージェントに「https://github.com/yugen0203/hokenchat の SETUP.md を読んでセットアップして」と頼むと、同じ手順を進めます。パスワードとキーの入力は本人が行います。</div>
+  <h3>新しい版に更新する</h3>
+  <ol class="steps">
+    <li>hokenchat を終了します。</li>
+    <li><span class="mono">hokenchat</span> フォルダの中で <span class="mono">git pull</span> を実行します。</li>
+    <li><span class="mono">python3 setup.py</span> をもう一度実行します。登録済みのデータ（顧客・タスク・文書・設定）はそのまま残ります。</li>
+  </ol>
+  <p>公式LINEをつなぐ手順は <span class="mono">SETUP.md</span> の6章にあります。アカウントの作成とキーの入力は本人が行います。</p>
+</section>
 
 <section id="start">
   <h2>ログインと最初の設定</h2>
@@ -285,6 +330,7 @@ footer { color: var(--sub); font-size: 12.5px; text-align: center }
     <tr><td>経過を残す</td><td>元の依頼のメッセージにリプライする（今と同じ）。リプライは自動でタスクの経過に入ります</td></tr>
     <tr><td>完了にする</td><td>元の依頼にリプライで「完了」、または「@ボット No.12 完了」</td></tr>
     <tr><td>状態を変える</td><td>「@ボット No.12 対応中」</td></tr>
+    <tr><td>使い方を見る</td><td>「@ボット ヘルプ」</td></tr>
     <tr><td>未完了の一覧</td><td>「@ボット 一覧」</td></tr>
     <tr><td>過去の依頼を探す</td><td>「@ボット 検索 小林工業」</td></tr>
     <tr><td>見積を依頼する</td><td>「@ボット 見積」→ 返ってきたリンクのフォームに書いて送る（7日間・1回だけ使えます）</td></tr>
@@ -363,6 +409,17 @@ footer { color: var(--sub); font-size: 12.5px; text-align: center }
   <p>送付状・封筒に印字する代理店名・郵便番号・住所・電話を設定します。</p>
 </section>
 
+<section id="limits">
+  <h2>まだできないこと（試作の範囲）</h2>
+  <ul>
+    <li>見積依頼フォームの内容は、タスクには入りますが、顧客DBと［見積依頼書］の画面には自動では入りません。</li>
+    <li>タスクの「未着の書類」の表示は、あとから書類が届いても変わりません。届いた書類そのものは、タスクの詳細に出ます。</li>
+    <li>LINEとつなぐための公開URLは、試作では起動のたびに変わります。変わったら、LINE Developers の Webhook URL と「フォーム用の公開URL」を入れ直します。本番は社内の受付サーバーで固定します。</li>
+    <li>使えるのは hokenchat を入れたPC1台の画面だけです。ほかのPCから画面を開く形は本番構成で行います。</li>
+    <li>データはすべて架空のものを使います。実在のお客さまの情報は、損保ジャパンへの確認が済むまで入れないでください。</li>
+  </ul>
+</section>
+
 <section id="faq">
   <h2>よくある質問</h2>
   <div class="tbl"><table>
@@ -380,6 +437,6 @@ footer { color: var(--sub); font-size: 12.5px; text-align: center }
   </table></div>
 </section>
 
-<footer>hokenchat 試作 第0.2.1版　操作マニュアル　作成：小林</footer>
+<footer>hokenchat 試作 第0.3版　操作・機能説明書　作成：小林</footer>
 </div></main>
 </div>
